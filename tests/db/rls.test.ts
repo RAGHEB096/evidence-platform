@@ -35,10 +35,15 @@ describe('an unassigned user', () => {
       const column = table === 'protocols' ? 'id' : 'protocol_id'
       expect(await count(client, table, column, w.p.protocolId), table).toBe(0)
     }
-    // Nor anything at all, for good measure.
+    // Nor anything at all, for good measure, apart from the audit events of
+    // their own actions (password change), which everyone may read.
     for (const table of DOMAIN_TABLES) {
       const { data } = await client.from(table).select('*')
-      expect(data, table).toEqual([])
+      if (table === 'audit_events') {
+        expect((data as { actor_id: string; protocol_id: string | null }[]).every((row) => row.actor_id === w.outsider.id && row.protocol_id === null)).toBe(true)
+      } else {
+        expect(data, table).toEqual([])
+      }
     }
   })
 

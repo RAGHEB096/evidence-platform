@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigation } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
+import { useMyRoles } from '@/features/protocols/my-roles'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/AppSidebar'
@@ -10,11 +11,12 @@ export function AppLayout() {
   const { profile } = useAuth()
   // Lazy pages load before the URL changes; show that the click registered.
   const navigation = useNavigation()
+  const roles = useMyRoles()
   const section = NAV_ITEMS.find((item) => isNavItemActive(item, pathname))
 
   return (
     <SidebarProvider>
-      <AppSidebar isAdmin={profile?.is_admin ?? false} />
+      <AppSidebar isAdmin={profile?.is_admin ?? false} isManager={[...(roles.data?.values() ?? [])].includes('manager')} />
       <SidebarInset>
         {navigation.state === 'loading' ? (
           <div role="progressbar" aria-label="Loading page" className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary" />

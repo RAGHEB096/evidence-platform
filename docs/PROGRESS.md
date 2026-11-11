@@ -13,8 +13,8 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 4 Protocol editor and hierarchy | Done | `ec5e647` |
 | 5 Execution and evidence upload | Done | `c874834` |
 | 6 Report builder and Word generation | Done | `9085007` (WIP), `631e647` |
-| 6b Owner feedback: release lock, status roll-up | Done | "Owner feedback: …" |
-| 7 Dashboard, audit viewer, settings, security review | Not started | |
+| 6b Owner feedback: release lock, status roll-up | Done | `d2b3e01` |
+| 7 Dashboard, audit viewer, settings, security review | Done | "Phase 7: …" |
 | 8 Full test run, clean-up, documentation, deployment | Not started | |
 
 ## Environment (this machine)
@@ -42,6 +42,8 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Phase 7 exit evidence (2026-11-11): `test:db` 135 passed (adds `dashboard.test.ts` for figures per role and anonymous refusal, `security.test.ts` for the review checks, `audit-coverage.test.ts` for every SPEC 4.10 action with its actor); `test:e2e` 16 passed (adds dashboard progress and storage, audit filter and change details, admin limits persisting and validation, a user changing display name and password); unit 70; lint and build clean, with no chunk warnings after lazy-loading every page except sign-in. Dashboard and audit trail checked visually. Review record: `docs/SECURITY-REVIEW.md`.
+
 Owner feedback round (2026-11-11), ADR-017: `test:db` 98 (adds 6 lifecycle and derived-step tests), `test:e2e` 13 (adds release lock and roll-up), unit 69 (adds 3 roll-up tests); lint and build clean; tree badges and status menu checked visually.
 
 Phase 6 exit evidence (2026-11-11): `test:db` 92 passed (adds 6 for `finalize_export`, `reorder_export_items`, `copy_export_to_draft`); `test:e2e` 12 passed (adds selecting images from two chapters, single and whole-chapter selection, caption override, reorder, the draft surviving a reload, generation and download, unzipping the .docx, history listing, re-download and contained evidence; the report test then passed 5 runs in a row); unit 66 (adds 13 for the report model and DOCX builder); lint and build clean. **Opened a generated report in Microsoft Word 16 on this machine** (automation, read-only, hidden). Word read it without errors, counted 4 pages and listed the Heading 1–3 paragraphs as expected, and its PDF export showed the layout from SPEC 4.7. The owner should still review a real report in Word, with real screenshots, themselves.
@@ -56,14 +58,14 @@ Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; un
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`), `20261111100500_report_exports.sql` (`reorder_export_items`, `finalize_export`, `copy_export_to_draft`), `20261111100600_release_lock_and_derived_steps.sql` (status `released`, structure lock triggers, `record_step_result` refusing status on parent steps).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`), `20261111100500_report_exports.sql` (`reorder_export_items`, `finalize_export`, `copy_export_to_draft`), `20261111100600_release_lock_and_derived_steps.sql` (status `released`, structure lock triggers, `record_step_result` refusing status on parent steps), `20261111100700_dashboard_and_audit_access.sql` (`dashboard_totals`, `protocol_overview`, `storage_usage`, audit policy for one's own actions), `20261111100800_revoke_public_function_execute.sql` (security review fix).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
 - Column-level grants decide what API roles may write. Positions, parents, `protocol_id`, `deleted_at`, execution fields, evidence hash/path/uploader and export status are never directly writable.
 - RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`, `record_step_result`, `reorder_export_items`, `finalize_export`, `copy_export_to_draft`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`.
 - Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`), `finalize-evidence`.
-- Still to come: `dashboard_stats` (Phase 7).
+- Dashboard: `dashboard_totals` and `protocol_overview` are `security invoker`, so RLS shapes the numbers; `storage_usage` is administrators only.
 - Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`, `<type>.duplicated` (with `source_id`).
 
 ## Decisions
@@ -137,6 +139,14 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Release lock and status roll-up:** see ADR-017. Statuses Draft / Released / Completed are changed from the protocol header. Outside Draft the structure and details are locked in the database. Every level shows a status derived from its children, through `effectiveStatus` in `src/features/protocols/tree.ts`.
 - **Applying migrations without losing data:** use `npx supabase migration up` for new migrations. `npx supabase db reset` wipes the local database, and so does every run of `test:db` and `test:e2e`.
 
+### Phase 7
+- **Dashboard** figures come from two `security invoker` SQL functions, so administrators get global numbers and everyone else only their protocols, with no client-side filtering. Execution progress counts steps without sub-steps (ADR-017).
+- **Storage usage** compares evidence and saved reports with `STORAGE_PLAN_LIMIT_BYTES` (1 GB, Supabase Free) in `src/config.ts`, warns above 80%, and shows unfinished uploads.
+- **Recent activity and the Audit Trail** read `audit_events` under RLS. A new policy lets everyone read their own actions. The Audit Trail page (nav item for administrators and managers) filters by protocol, user, event type and date on the server, 50 per page, and expands each event into a before/after table.
+- **Settings:** display name for everyone (audited); password change for everyone, verifying the current password first and auditing via `complete_password_change`; administrators edit the upload limit (1–50 MB, also applied to the bucket), report page size and image long edge, validated in the form and by the database CHECK.
+- **Security review:** see `docs/SECURITY-REVIEW.md`. One real finding fixed: `anon` could execute public RPCs because PostgreSQL's EXECUTE grant to PUBLIC is global. Pinned by tests.
+- **Lazy loading:** every page except sign-in, setup and change-password loads on demand; the main chunk is ~500 kB (React, router, supabase-js, UI kit).
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
@@ -151,4 +161,4 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 
 ## Next step
 
-Phase 7: dashboard (totals, my protocols, recent activity from the audit trail, per-protocol row with chapters, test runs and execution progress, admin storage usage against the plan limit) computed on the server under RLS; audit viewer (administrators everything, managers their protocols; filters by protocol, user, event type and date); Settings (display name and own password for everyone; upload limit, report page size and image long edge for administrators); a security review pass over every table and bucket confirming RLS coverage, plus audit events for every action in SPEC 4.10.
+Phase 8: full test run and clean-up; time a large report (hundreds of images); README (architecture, stack, database, local install, Supabase configuration, administrator initialisation, environment variables, test commands, limits and scope including free-tier limits, audit trail limits, orphan cleanup query, and no compliance claim); docs/DEPLOY.md checklist (GitHub, Supabase project, migrations, buckets, Auth settings, function secrets, Edge Functions, Cloudflare Pages build, env vars, SPA fallback, first-time setup, deleting the setup token, live smoke test) with free-tier numbers from the current pricing pages; deployment needs the owner's accounts, otherwise stop at the checklist. Confirm the synthetic email domain against a hosted project (ADR-001).

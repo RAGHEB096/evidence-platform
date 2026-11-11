@@ -8,6 +8,7 @@ describe('navigation', () => {
       'Protocols',
       'Evidence Library',
       'Generated Documents',
+      'Audit Trail',
       'User Management',
       'Settings',
     ])
@@ -16,6 +17,12 @@ describe('navigation', () => {
   it('hides User Management from non-administrators', () => {
     expect(visibleNavItems(false).map((item) => item.label)).not.toContain('User Management')
     expect(visibleNavItems(true).map((item) => item.label)).toContain('User Management')
+  })
+
+  it('shows the Audit Trail to administrators and protocol managers only', () => {
+    expect(visibleNavItems(false).map((item) => item.label)).not.toContain('Audit Trail')
+    expect(visibleNavItems(false, true).map((item) => item.label)).toContain('Audit Trail')
+    expect(visibleNavItems(false, true).map((item) => item.label)).not.toContain('User Management')
   })
 
   it('marks the dashboard active only on the root path', () => {

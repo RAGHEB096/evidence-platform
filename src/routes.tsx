@@ -3,12 +3,10 @@ import type { RouteObject } from 'react-router'
 import { RedirectIfSignedIn, RequireAdmin, RequireAuth, RequirePasswordChange } from '@/auth/guards'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage'
-import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ProtocolsPage } from '@/pages/ProtocolsPage'
 import { RouteErrorPage } from '@/pages/RouteErrorPage'
-import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
 
 // Heavier screens load on demand (dnd-kit, evidence views, the report builder
@@ -38,13 +36,14 @@ export const routes: RouteObject[] = [
           {
             element: <AppLayout />,
             children: [
-              { index: true, element: <DashboardPage /> },
+              { index: true, lazy: page(() => import('@/pages/DashboardPage'), 'DashboardPage') },
               { path: 'protocols', element: <ProtocolsPage /> },
               { path: 'protocols/:protocolId', lazy: page(() => import('@/pages/ProtocolDetailPage'), 'ProtocolDetailPage') },
               { path: 'protocols/:protocolId/runs/:runId', lazy: page(() => import('@/pages/TestRunPage'), 'TestRunPage') },
               { path: 'protocols/:protocolId/report', lazy: page(() => import('@/pages/ReportBuilderPage'), 'ReportBuilderPage') },
               { path: 'evidence', lazy: page(() => import('@/pages/EvidenceLibraryPage'), 'EvidenceLibraryPage') },
               { path: 'documents', lazy: page(() => import('@/pages/GeneratedDocumentsPage'), 'GeneratedDocumentsPage') },
+              { path: 'audit', lazy: page(() => import('@/pages/AuditTrailPage'), 'AuditTrailPage') },
               { path: 'documents/:exportId', lazy: page(() => import('@/pages/ExportDetailPage'), 'ExportDetailPage') },
               {
                 element: <RequireAdmin />,
@@ -53,7 +52,7 @@ export const routes: RouteObject[] = [
                   { path: 'users/:userId', lazy: page(() => import('@/pages/UserDetailPage'), 'UserDetailPage') },
                 ],
               },
-              { path: 'settings', element: <SettingsPage /> },
+              { path: 'settings', lazy: page(() => import('@/pages/SettingsPage'), 'SettingsPage') },
               { path: '*', element: <NotFoundPage /> },
             ],
           },

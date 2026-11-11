@@ -15,7 +15,7 @@ import {
 import { isNavItemActive, visibleNavItems } from '@/components/layout/nav'
 import { UserMenu } from '@/components/layout/UserMenu'
 
-export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
+export function AppSidebar({ isAdmin, isManager }: { isAdmin: boolean; isManager: boolean }) {
   const { pathname } = useLocation()
 
   return (
@@ -42,7 +42,7 @@ export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
           <SidebarGroupContent>
             <nav aria-label="Main">
               <SidebarMenu>
-                {visibleNavItems(isAdmin).map((item) => {
+                {visibleNavItems(isAdmin, isManager).map((item) => {
                   const active = isNavItemActive(item, pathname)
                   return (
                     <SidebarMenuItem key={item.to}>
