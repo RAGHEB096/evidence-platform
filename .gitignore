@@ -1,0 +1,26 @@
+node_modules
+dist
+*.local
+.env
+.env.*
+!.env.example
+coverage
+playwright-report
+test-results
+blob-report
+playwright/.cache
+.vite
+*.tsbuildinfo
+
+# Supabase
+supabase/.temp
+supabase/.branches
+supabase/functions/.env
+supabase/.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea

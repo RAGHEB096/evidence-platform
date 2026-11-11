@@ -1,0 +1,3 @@
+-- Local development seed data only (CLAUDE.md). Never applied to a hosted project.
+-- Accounts are not seeded: the first administrator is created through /setup
+-- (ADR-002), and the database tests create their own users.
