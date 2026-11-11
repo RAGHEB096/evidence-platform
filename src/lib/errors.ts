@@ -20,6 +20,8 @@ const HINT_MESSAGES: Record<string, string> = {
   not_found: 'The item was not found, or you do not have access to it.',
   too_long: 'Results and comments are at most 10,000 characters.',
   step_mismatch: 'The step does not belong to this test run.',
+  protocol_locked: 'This protocol is released or completed, so its structure and details are locked. Set it back to Draft to change them.',
+  status_derived: 'This step’s status follows its sub-steps; record the sub-steps instead.',
   selection_changed: 'The selection changed while the report was being generated. Generate it again.',
   invalid_path: 'The file is not at its expected location.',
   upload_missing: 'The file was not found in storage. Try again.',

@@ -45,7 +45,7 @@ export function ProtocolsPage() {
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: 'all', label: 'All statuses' },
     { value: 'draft', label: 'Draft' },
-    { value: 'active', label: 'Active' },
+    { value: 'released', label: 'Released' },
     { value: 'completed', label: 'Completed' },
     ...(profile?.is_admin ? [{ value: 'archived' as const, label: 'Archived' }] : []),
   ]

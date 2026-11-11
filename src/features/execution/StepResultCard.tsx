@@ -13,7 +13,7 @@ import { EvidenceGallery } from '@/features/evidence/EvidenceGallery'
 import { EvidenceUploader } from '@/features/evidence/EvidenceUploader'
 import type { UploadTarget } from '@/features/evidence/upload'
 import { structureKeys } from '@/features/protocols/structure-api'
-import type { StepNode } from '@/features/protocols/tree'
+import { effectiveStatus, hasLiveChildren, type StepNode } from '@/features/protocols/tree'
 import { useUserDirectory } from '@/features/users/api'
 import { toUserMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
@@ -49,6 +49,8 @@ export function StepResultCard({
   const dirty = actual !== row.actual_result || status !== row.status || comments !== row.comments
   const executor = row.executed_by ? directory.data?.get(row.executed_by) : undefined
   const prefix = `step-${row.id}`
+  // A step with sub-steps takes its status from them (ADR-017).
+  const derived = hasLiveChildren(step)
 
   const save = useMutation({
     mutationFn: async () => {
@@ -81,7 +83,7 @@ export function StepResultCard({
           </h3>
           <p className="text-sm whitespace-pre-wrap">{row.description}</p>
         </div>
-        <StatusBadge status={STEP_STATUSES[row.status]} />
+        <StatusBadge status={STEP_STATUSES[effectiveStatus(step)]} />
       </div>
 
       <div className="rounded-md bg-muted/50 p-3 text-sm">
@@ -103,6 +105,11 @@ export function StepResultCard({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor={`${prefix}-status`}>Status</Label>
+            {derived ? (
+              <p id={`${prefix}-status`} className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Follows its sub-steps: <span className="font-medium text-foreground">{STEP_STATUSES[effectiveStatus(step)].label}</span>
+              </p>
+            ) : (
             <Select value={status} onValueChange={(value) => setStatus(value as StepStatus)}>
               <SelectTrigger id={`${prefix}-status`} className="w-full">
                 <SelectValue />
@@ -115,6 +122,7 @@ export function StepResultCard({
                 ))}
               </SelectContent>
             </Select>
+            )}
           </div>
           <div className="space-y-1.5 md:col-span-2">
             <Label htmlFor={`${prefix}-comments`}>Comments</Label>

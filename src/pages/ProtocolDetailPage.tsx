@@ -7,15 +7,15 @@ import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/states/EmptyState'
 import { ErrorState } from '@/components/states/ErrorState'
 import { LoadingState } from '@/components/states/LoadingState'
-import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ROLE_LABELS, roleAtLeast } from '@/domain/roles'
-import { ARCHIVED_STATUS, PROTOCOL_STATUSES } from '@/domain/status'
+import { PROTOCOL_STATUSES } from '@/domain/status'
 import { ArchiveNodeDialog, type ArchiveTarget } from '@/features/protocols/editor/ArchiveNodeDialog'
 import { ProtocolTreeEditor } from '@/features/protocols/editor/ProtocolTreeEditor'
 import { ProtocolDetailsForm } from '@/features/protocols/ProtocolDetailsForm'
+import { ProtocolStatusControl } from '@/features/protocols/ProtocolStatusControl'
 import { useMyProtocolRole, useProtocol, useProtocolRows, useProtocolTeam, useStructureMutations } from '@/features/protocols/structure-api'
 import { useUserDirectory } from '@/features/users/api'
 import { toUserMessage } from '@/lib/errors'
@@ -53,6 +53,8 @@ export function ProtocolDetailPage() {
 
   const p = protocol.data
   const isArchived = !!p.deleted_at
+  const isLocked = p.status !== 'draft'
+  const canEditStructure = canManage && !isArchived && !isLocked
   const name = (id: string) => directory.data?.get(id)?.display_name ?? 'Unknown user'
 
   return (
@@ -69,7 +71,7 @@ export function ProtocolDetailPage() {
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-mono">{p.reference}</span>
             <span>Version {p.version}</span>
-            <StatusBadge status={isArchived ? ARCHIVED_STATUS : PROTOCOL_STATUSES[p.status]} />
+            <ProtocolStatusControl protocol={p} canManage={canManage} />
             <span>
               Your role: {isAdmin ? 'Administrator' : role.data ? ROLE_LABELS[role.data] : '—'}
             </span>
@@ -114,6 +116,11 @@ export function ProtocolDetailPage() {
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           This protocol is archived. Only administrators can see it. Restore it to make it available to its team again.
         </p>
+      ) : isLocked ? (
+        <p className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          This protocol is {PROTOCOL_STATUSES[p.status].label.toLowerCase()}: its structure and details are locked, while results and evidence can still be recorded.
+          {canManage ? ' Set it back to Draft from the status menu to edit it.' : ''}
+        </p>
       ) : null}
 
       <Tabs defaultValue="structure">
@@ -128,11 +135,11 @@ export function ProtocolDetailPage() {
           ) : rows.isError ? (
             <ErrorState message={toUserMessage(rows.error)} onRetry={() => void rows.refetch()} />
           ) : (
-            <ProtocolTreeEditor protocolId={p.id} rows={rows.data} canEdit={canManage && !isArchived} isAdmin={isAdmin} />
+            <ProtocolTreeEditor protocolId={p.id} rows={rows.data} canEdit={canEditStructure} isAdmin={isAdmin} />
           )}
         </TabsContent>
         <TabsContent value="details" className="pt-4">
-          <ProtocolDetailsForm protocol={p} canEdit={canManage} createdByName={name(p.created_by)} />
+          <ProtocolDetailsForm protocol={p} canEdit={canEditStructure} createdByName={name(p.created_by)} />
         </TabsContent>
         {canManage ? (
           <TabsContent value="team" className="space-y-3 pt-4">

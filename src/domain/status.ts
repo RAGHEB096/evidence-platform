@@ -23,9 +23,16 @@ export type StepStatus = keyof typeof STEP_STATUSES
 
 export const PROTOCOL_STATUSES = {
   draft: { label: 'Draft', tone: 'neutral' },
-  active: { label: 'Active', tone: 'info' },
+  released: { label: 'Released', tone: 'info' },
   completed: { label: 'Completed', tone: 'success' },
 } as const satisfies Record<string, StatusDefinition>
+
+/** What each lifecycle state allows (ADR-017). */
+export const PROTOCOL_STATUS_HELP: Record<keyof typeof PROTOCOL_STATUSES, string> = {
+  draft: 'Structure and details can be edited.',
+  released: 'Structure and details are locked; results and evidence can be recorded.',
+  completed: 'Execution is finished; structure and details stay locked.',
+}
 
 export type ProtocolStatus = keyof typeof PROTOCOL_STATUSES
 

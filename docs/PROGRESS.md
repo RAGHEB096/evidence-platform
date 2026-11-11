@@ -12,7 +12,8 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 3 User management, protocol access | Done | `038d80a` |
 | 4 Protocol editor and hierarchy | Done | `ec5e647` |
 | 5 Execution and evidence upload | Done | `c874834` |
-| 6 Report builder and Word generation | Done | `9085007` (WIP) + "Phase 6: …" |
+| 6 Report builder and Word generation | Done | `9085007` (WIP), `631e647` |
+| 6b Owner feedback: release lock, status roll-up | Done | "Owner feedback: …" |
 | 7 Dashboard, audit viewer, settings, security review | Not started | |
 | 8 Full test run, clean-up, documentation, deployment | Not started | |
 
@@ -41,6 +42,8 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Owner feedback round (2026-11-11), ADR-017: `test:db` 98 (adds 6 lifecycle and derived-step tests), `test:e2e` 13 (adds release lock and roll-up), unit 69 (adds 3 roll-up tests); lint and build clean; tree badges and status menu checked visually.
+
 Phase 6 exit evidence (2026-11-11): `test:db` 92 passed (adds 6 for `finalize_export`, `reorder_export_items`, `copy_export_to_draft`); `test:e2e` 12 passed (adds selecting images from two chapters, single and whole-chapter selection, caption override, reorder, the draft surviving a reload, generation and download, unzipping the .docx, history listing, re-download and contained evidence; the report test then passed 5 runs in a row); unit 66 (adds 13 for the report model and DOCX builder); lint and build clean. **Opened a generated report in Microsoft Word 16 on this machine** (automation, read-only, hidden). Word read it without errors, counted 4 pages and listed the Heading 1–3 paragraphs as expected, and its PDF export showed the layout from SPEC 4.7. The owner should still review a real report in Word, with real screenshots, themselves.
 
 Phase 5 exit evidence (2026-11-11): `test:db` 86 passed (adds 12: finalize-evidence registration and hashing, rejection of renamed/truncated/mismatched files with cleanup, refusal to touch others' or registered objects, path checks, bucket size limit following the setting, `record_step_result` stamping and audit, evidence archive keeping the file); `test:e2e` 11 passed (adds results, a three-file upload with one rejected file, preview with next/previous and keyboard, caption edit, persistence, library search and filter); unit 53 (adds 18 for image validation with real fixtures); typecheck, lint, build clean. Visually checked the execution view and the preview dialog in Chromium.
@@ -53,7 +56,7 @@ Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; un
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`), `20261111100500_report_exports.sql` (`reorder_export_items`, `finalize_export`, `copy_export_to_draft`).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`), `20261111100500_report_exports.sql` (`reorder_export_items`, `finalize_export`, `copy_export_to_draft`), `20261111100600_release_lock_and_derived_steps.sql` (status `released`, structure lock triggers, `record_step_result` refusing status on parent steps).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
@@ -130,6 +133,10 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Selection checkboxes update optimistically**, written to the cache in the same frame as the click; a draft created by the first click inherits the optimistic items before the page switches to it.
 - **Route-level lazy loading** with React Router's `lazy` route property; a thin progress bar shows while a page loads. The main chunk went from 1.08 MB to 485 kB, and `docx` loads only when generating.
 
+### Owner feedback (after Phase 6)
+- **Release lock and status roll-up:** see ADR-017. Statuses Draft / Released / Completed are changed from the protocol header. Outside Draft the structure and details are locked in the database. Every level shows a status derived from its children, through `effectiveStatus` in `src/features/protocols/tree.ts`.
+- **Applying migrations without losing data:** use `npx supabase migration up` for new migrations. `npx supabase db reset` wipes the local database, and so does every run of `test:db` and `test:e2e`.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
@@ -138,6 +145,7 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - `evidence_files` rows are inserted directly by test fixtures until `finalize-evidence` exists (Phase 5).
 
 - One run of `report.spec.ts` during Phase 6 reported a failure whose details were filtered out of the log. After the optimistic-selection fix it passed 5 times in a row and in the full suite. Watch for flakiness there.
+- The test suites share the local database with manual use, so running them wipes the owner's local data. Separating them (a second local stack or schema) is proposed as the next step.
 - Very large reports (hundreds of high-resolution screenshots) are built entirely in browser memory. Not yet measured; Phase 8 should time a large generation.
 - A stray empty folder tree `F:cUsers…` outside the repo was created during Phase 5 by a screenshot script. It can be deleted.
 

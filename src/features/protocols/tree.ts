@@ -198,7 +198,7 @@ export function flattenSteps(steps: StepNode[]): StepNode[] {
 }
 
 /**
- * A test run's status, derived from its live steps (SPEC 4.4: not stored).
+ * Status derived from a list of child statuses (SPEC 4.4: not stored).
  * Failed beats Blocked beats In Progress; a run is Passed when every step has
  * a final status and at least one passed.
  */
@@ -210,6 +210,32 @@ export function deriveRunStatus(statuses: readonly StepStatus[]): StepStatus {
   if (statuses.every((status) => status === 'passed' || status === 'not_applicable')) return 'passed'
   if (statuses.every((status) => status === 'not_started')) return 'not_started'
   return 'in_progress'
+}
+
+/**
+ * The status shown for any node (owner feedback, ADR-017): a step without
+ * live sub-steps shows its recorded status; everything above is derived from
+ * its live children with `deriveRunStatus`, so finishing the sub-steps
+ * updates every level above them. Archived nodes are ignored.
+ */
+export function effectiveStatus(node: TreeNode): StepStatus {
+  const live = childrenOf(node).filter((child) => !child.row.deleted_at)
+  if (node.type === 'test_step' && live.length === 0) return node.row.status
+  return deriveRunStatus(live.map(effectiveStatus))
+}
+
+/** Live steps without live sub-steps: the ones whose status is recorded directly. */
+export function leafSteps(steps: StepNode[]): StepNode[] {
+  return steps
+    .filter((step) => !step.row.deleted_at)
+    .flatMap((step) => {
+      const children = leafSteps(step.children)
+      return step.children.some((child) => !child.row.deleted_at) ? children : [step]
+    })
+}
+
+export function hasLiveChildren(step: StepNode): boolean {
+  return step.children.some((child) => !child.row.deleted_at)
 }
 
 export const NODE_LABELS: Record<NodeType, string> = {

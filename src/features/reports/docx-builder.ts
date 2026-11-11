@@ -150,7 +150,7 @@ function stepBlock(step: ReportStep): Paragraph[] {
     }),
     labelled('Expected result', row.expected_result),
     labelled('Actual result', row.actual_result),
-    labelled('Status', statusText(row.status), { bold: true }),
+    labelled('Status', statusText(step.status), { bold: true }),
     ...(row.comments ? [labelled('Comments', row.comments)] : []),
   ]
 }

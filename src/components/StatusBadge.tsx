@@ -11,13 +11,14 @@ const toneClasses: Record<StatusTone, { badge: string; dot: string }> = {
 }
 
 /** Status shown as label plus colour, never colour alone. */
-export function StatusBadge({ status, className }: { status: StatusDefinition; className?: string }) {
+export function StatusBadge({ status, className, size = 'md' }: { status: StatusDefinition; className?: string; size?: 'sm' | 'md' }) {
   const tone = toneClasses[status.tone]
   return (
     <span
       data-tone={status.tone}
       className={cn(
-        'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1.5 rounded-full border font-medium whitespace-nowrap',
+        size === 'sm' ? 'h-5 px-2 text-[11px]' : 'h-6 px-2.5 text-xs',
         tone.badge,
         className,
       )}

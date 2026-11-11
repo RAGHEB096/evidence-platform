@@ -16,7 +16,7 @@ import { EvidencePreviewDialog } from '@/features/evidence/EvidencePreviewDialog
 import { EvidenceUploader } from '@/features/evidence/EvidenceUploader'
 import { StepResultCard } from '@/features/execution/StepResultCard'
 import { useMyProtocolRole, useProtocol, useProtocolRows } from '@/features/protocols/structure-api'
-import { deriveRunStatus, findTestRun, flattenSteps, type StepNode } from '@/features/protocols/tree'
+import { effectiveStatus, findTestRun, flattenSteps, leafSteps, type StepNode } from '@/features/protocols/tree'
 import { toUserMessage } from '@/lib/errors'
 
 /** Depth of each step for indentation, in display order. */
@@ -67,7 +67,8 @@ export function TestRunPage() {
   const isAdmin = !!profile?.is_admin
   const canRecord = roleAtLeast(role.data, 'tester', isAdmin) && !protocol.data.deleted_at
   const steps = flattenSteps(run.steps)
-  const statuses = steps.map((step) => step.row.status)
+  // Progress counts the steps whose status is recorded directly (no sub-steps).
+  const statuses = leafSteps(run.steps).map((step) => step.row.status)
   const finished = statuses.filter((status) => FINAL_STEP_STATUSES.includes(status)).length
   const passed = statuses.filter((status) => status === 'passed').length
   const runEvidence = ordered.filter((row) => !row.test_step_id)
@@ -100,9 +101,9 @@ export function TestRunPage() {
               {chapter.number} {chapter.row.title} › {fn.number} {fn.row.title}
             </span>
             {run.row.reference ? <span className="font-mono">{run.row.reference}</span> : null}
-            <StatusBadge status={STEP_STATUSES[deriveRunStatus(statuses)]} />
+            <StatusBadge status={STEP_STATUSES[effectiveStatus(run)]} />
             <span>
-              {finished} of {steps.length} steps executed · {passed} passed
+              {finished} of {statuses.length} steps executed · {passed} passed
             </span>
           </span>
         }

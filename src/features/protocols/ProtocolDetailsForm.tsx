@@ -1,39 +1,31 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import type { z } from 'zod'
 import { fieldAria } from '@/components/field-aria'
 import { FormField } from '@/components/FormField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { PROTOCOL_STATUSES, type ProtocolStatus } from '@/domain/status'
 import type { ProtocolRow } from '@/features/protocols/api'
 import { protocolDetailsSchema } from '@/features/protocols/schema'
 import { useStructureMutations } from '@/features/protocols/structure-api'
 import { toUserMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 
-const schema = protocolDetailsSchema.extend({ status: z.enum(['draft', 'active', 'completed']) })
-type Values = z.infer<typeof schema>
+type Values = z.infer<typeof protocolDetailsSchema>
 
+/** Name, reference, version and description. Editable by managers while the protocol is a draft (ADR-017). */
 export function ProtocolDetailsForm({ protocol, canEdit, createdByName }: { protocol: ProtocolRow; canEdit: boolean; createdByName: string }) {
   const { updateProtocol } = useStructureMutations(protocol.id)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const form = useForm<Values>({
-    resolver: zodResolver(schema),
-    values: {
-      reference: protocol.reference,
-      name: protocol.name,
-      version: protocol.version,
-      description: protocol.description,
-      status: protocol.status,
-    },
+    resolver: zodResolver(protocolDetailsSchema),
+    values: { reference: protocol.reference, name: protocol.name, version: protocol.version, description: protocol.description },
   })
   const { errors, isSubmitting, isDirty } = form.formState
-  const readOnly = !canEdit || !!protocol.deleted_at
+  const readOnly = !canEdit
 
   async function onSubmit(values: Values) {
     setSubmitError(null)
@@ -47,32 +39,12 @@ export function ProtocolDetailsForm({ protocol, canEdit, createdByName }: { prot
 
   return (
     <form className="max-w-2xl space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <div className="grid gap-4 sm:grid-cols-[1fr_8rem_10rem]">
+      <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
         <FormField id="details-reference" label="Reference" error={errors.reference?.message}>
           <Input readOnly={readOnly} {...fieldAria('details-reference', errors.reference?.message)} {...form.register('reference')} />
         </FormField>
         <FormField id="details-version" label="Version" error={errors.version?.message}>
           <Input readOnly={readOnly} {...fieldAria('details-version', errors.version?.message)} {...form.register('version')} />
-        </FormField>
-        <FormField id="details-status" label="Status">
-          <Controller
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={(value) => field.onChange(value as ProtocolStatus)} disabled={readOnly}>
-                <SelectTrigger id="details-status" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(PROTOCOL_STATUSES) as ProtocolStatus[]).map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {PROTOCOL_STATUSES[status].label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
         </FormField>
       </div>
       <FormField id="details-name" label="Name" error={errors.name?.message}>

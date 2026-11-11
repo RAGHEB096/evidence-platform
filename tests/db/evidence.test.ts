@@ -155,19 +155,19 @@ describe('finalize-evidence', () => {
 describe('record_step_result', () => {
   it('lets testers record results, stamping who and when', async () => {
     const { error } = await w.tester.client.rpc('record_step_result', {
-      p_step_id: w.p.stepId,
+      p_step_id: w.p.subStepId,
       p_actual_result: 'The application opened successfully.',
       p_status: 'passed',
       p_comments: 'Build 4.2.1',
     })
     expect(error).toBeNull()
-    const { data } = await w.viewer.client.from('test_steps').select('actual_result, status, comments, executed_by, executed_at').eq('id', w.p.stepId).single()
+    const { data } = await w.viewer.client.from('test_steps').select('actual_result, status, comments, executed_by, executed_at').eq('id', w.p.subStepId).single()
     expect(data).toMatchObject({ actual_result: 'The application opened successfully.', status: 'passed', comments: 'Build 4.2.1', executed_by: w.tester.id })
     expect(data!.executed_at).not.toBeNull()
 
     const [event] = await sql<{ actor_id: string; metadata: { changes: Record<string, unknown> } }>(
       `select actor_id, metadata from public.audit_events where event_type = 'test_step.result_recorded' and entity_id = $1 order by id desc limit 1`,
-      [w.p.stepId],
+      [w.p.subStepId],
     )
     expect(event!.actor_id).toBe(w.tester.id)
     expect(event!.metadata.changes).toHaveProperty('status', { old: 'not_started', new: 'passed' })
@@ -175,10 +175,10 @@ describe('record_step_result', () => {
 
   it('records nothing when nothing changed', async () => {
     const count = async () =>
-      Number((await sql<{ n: string }>(`select count(*) n from public.audit_events where event_type = 'test_step.result_recorded' and entity_id = $1`, [w.p.stepId]))[0]!.n)
+      Number((await sql<{ n: string }>(`select count(*) n from public.audit_events where event_type = 'test_step.result_recorded' and entity_id = $1`, [w.p.subStepId]))[0]!.n)
     const before = await count()
     await w.tester.client.rpc('record_step_result', {
-      p_step_id: w.p.stepId,
+      p_step_id: w.p.subStepId,
       p_actual_result: 'The application opened successfully.',
       p_status: 'passed',
       p_comments: 'Build 4.2.1',

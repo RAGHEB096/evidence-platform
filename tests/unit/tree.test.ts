@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   buildProtocolTree,
   deriveRunStatus,
+  effectiveStatus,
   flattenSteps,
+  leafSteps,
   moveItem,
   type ChapterRow,
   type FunctionRow,
@@ -120,6 +122,46 @@ describe('moveItem', () => {
   it('ignores moves past either end', () => {
     expect(moveItem(['a', 'b'], 0, -1)).toEqual(['a', 'b'])
     expect(moveItem(['a', 'b'], 1, 2)).toEqual(['a', 'b'])
+  })
+})
+
+describe('effectiveStatus', () => {
+  function withStatuses(statuses: Record<string, TestStepRow['status']>) {
+    const rows = fixture()
+    // s1, s2 (parent of s2a, archived s2b, s2c which is parent of s2c1)
+    const [s2c1, s2b, s2, s1, s2c, s2a] = rows.steps
+    const named = { s1: s1!, s2: s2!, s2a: s2a!, s2b: s2b!, s2c: s2c!, s2c1: s2c1! }
+    for (const [name, status] of Object.entries(statuses)) named[name as keyof typeof named].status = status
+    const tree = buildProtocolTree(rows)
+    const chapter = tree[0]!
+    const fn = chapter.functions[0]!
+    const run = fn.testRuns[0]!
+    const step = (n: string) => flattenSteps(run.steps).find((s) => s.row.id === named[n as keyof typeof named].id)!
+    return { chapter, fn, run, step }
+  }
+
+  it('derives a parent step from its live sub-steps, ignoring archived ones and its own recorded value', () => {
+    const t = withStatuses({ s2: 'failed', s2a: 'passed', s2b: 'failed', s2c1: 'passed' })
+    expect(effectiveStatus(t.step('s2c'))).toBe('passed')
+    expect(effectiveStatus(t.step('s2'))).toBe('passed')
+  })
+
+  it('rolls up to test run, function and chapter as the sub-steps finish', () => {
+    const before = withStatuses({ s1: 'passed', s2a: 'passed', s2c1: 'not_started' })
+    expect(effectiveStatus(before.run)).toBe('in_progress')
+    expect(effectiveStatus(before.chapter)).toBe('in_progress')
+
+    const after = withStatuses({ s1: 'passed', s2a: 'passed', s2c1: 'passed' })
+    expect(effectiveStatus(after.step('s2'))).toBe('passed')
+    expect(effectiveStatus(after.run)).toBe('passed')
+    // The chapter's second function has no test runs yet, so the chapter is not done.
+    expect(effectiveStatus(after.fn)).toBe('passed')
+    expect(effectiveStatus(after.chapter)).toBe('in_progress')
+  })
+
+  it('lists the leaf steps whose status is recorded directly', () => {
+    const t = withStatuses({})
+    expect(leafSteps(t.run.steps).map((s) => s.number)).toEqual(['1', '2.1', '2.2.1'])
   })
 })
 

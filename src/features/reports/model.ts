@@ -1,5 +1,6 @@
 import type { EvidenceRow } from '@/features/evidence/api'
-import type { ChapterNode, FunctionNode, StepNode, TestRunNode } from '@/features/protocols/tree'
+import type { StepStatus } from '@/domain/status'
+import { effectiveStatus, type ChapterNode, type FunctionNode, type StepNode, type TestRunNode } from '@/features/protocols/tree'
 
 export interface SelectionItem {
   evidence_id: string
@@ -17,6 +18,8 @@ export interface ReportImage {
 export interface ReportStep {
   node: StepNode
   depth: number
+  /** Recorded status, or derived from sub-steps when it has any (ADR-017). */
+  status: StepStatus
   images: ReportImage[]
 }
 
@@ -94,7 +97,7 @@ export function buildReportModel(input: {
       const images = toImages(byStep.get(node.row.id) ?? [])
       const children = walkSteps(node.children, depth + 1)
       if (!include && images.length === 0 && children.length === 0) return []
-      return [{ node, depth, images }, ...children]
+      return [{ node, depth, status: effectiveStatus(node), images }, ...children]
     })
 
   const chapters: ReportChapter[] = []

@@ -25,7 +25,9 @@ import {
 import { useEditor } from '@/features/protocols/editor/editor-context'
 import { nodeLabel } from '@/features/protocols/editor/node-label'
 import { DragHandle, SortableItem, SortableList } from '@/features/protocols/editor/SortableList'
-import { CHILD_TYPE, childrenOf, moveItem, NODE_LABELS, type NodeType, type TreeNode } from '@/features/protocols/tree'
+import { StatusBadge } from '@/components/StatusBadge'
+import { STEP_STATUSES } from '@/domain/status'
+import { CHILD_TYPE, childrenOf, effectiveStatus, moveItem, NODE_LABELS, type NodeType, type TreeNode } from '@/features/protocols/tree'
 import { cn } from '@/lib/utils'
 
 const ROW_STYLE: Record<NodeType, string> = {
@@ -159,7 +161,7 @@ function TreeNodeRow({
             <div className="truncate text-xs text-muted-foreground">Expected: {node.row.expected_result}</div>
           ) : null}
         </div>
-        {isArchived ? <Badge variant="outline">Archived</Badge> : null}
+        {isArchived ? <Badge variant="outline">Archived</Badge> : <StatusBadge status={STEP_STATUSES[effectiveStatus(node)]} size="sm" className="shrink-0" />}
 
         {canMoveUp || canMoveDown ? (
           <div className="flex shrink-0">
