@@ -39,14 +39,16 @@ export function useProtocolRows(protocolId: string) {
     enabled: !!protocolId,
     queryFn: async (): Promise<ProtocolRows> => {
       const supabase = getSupabase()
-      const [chapters, functions, testRuns, steps] = await Promise.all([
+      const [chapters, functions, testRuns, protocol, steps] = await Promise.all([
         supabase.from('chapters').select(`${BASE}, title, description`).eq('protocol_id', protocolId),
         supabase.from('functions').select(`${BASE}, chapter_id, title, description`).eq('protocol_id', protocolId),
-        supabase.from('test_runs').select(`${BASE}, function_id, reference, title, description`).eq('protocol_id', protocolId),
+        supabase.from('test_runs').select(`${BASE}, function_id, reference, title, description, expected_result, actual_result, status, comments, executed_by, executed_at`).eq('protocol_id', protocolId),
+        supabase.from('protocols').select('chapter_start').eq('id', protocolId).maybeSingle(),
         supabase.from('test_steps').select(STEP_COLUMNS).eq('protocol_id', protocolId),
       ])
-      for (const result of [chapters, functions, testRuns, steps]) if (result.error) throw result.error
+      for (const result of [chapters, functions, testRuns, protocol, steps]) if (result.error) throw result.error
       return {
+        chapterStart: (protocol.data as { chapter_start: number } | null)?.chapter_start ?? 1,
         chapters: chapters.data as ChapterRow[],
         functions: functions.data as FunctionRow[],
         testRuns: testRuns.data as TestRunRow[],
@@ -201,7 +203,7 @@ export function useStructureMutations(protocolId: string) {
   })
 
   const updateProtocol = useMutation({
-    mutationFn: async (fields: Partial<Pick<ProtocolRow, 'reference' | 'name' | 'description' | 'version' | 'status'>>) => {
+    mutationFn: async (fields: Partial<Pick<ProtocolRow, 'reference' | 'name' | 'description' | 'version' | 'status' | 'chapter_start'>>) => {
       const { data, error } = await getSupabase().from('protocols').update(fields).eq('id', protocolId).select('id')
       if (error) throw error
       if (!data?.length) throw { code: '42501' }

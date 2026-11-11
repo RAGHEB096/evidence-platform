@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ListChecksIcon, LockIcon } from 'lucide-react'
+import { ArrowLeftIcon, LockIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
@@ -14,6 +14,7 @@ import { useRunEvidence, useUploadLimit, type EvidenceRow } from '@/features/evi
 import { EvidenceGallery } from '@/features/evidence/EvidenceGallery'
 import { EvidencePreviewDialog } from '@/features/evidence/EvidencePreviewDialog'
 import { EvidenceUploader } from '@/features/evidence/EvidenceUploader'
+import { RunResultCard } from '@/features/execution/RunResultCard'
 import { StepResultCard } from '@/features/execution/StepResultCard'
 import { useMyProtocolRole, useProtocol, useProtocolRows } from '@/features/protocols/structure-api'
 import { effectiveStatus, findTestRun, flattenSteps, leafSteps, type StepNode } from '@/features/protocols/tree'
@@ -68,7 +69,9 @@ export function TestRunPage() {
   const canRecord = roleAtLeast(role.data, 'tester', isAdmin) && !protocol.data.deleted_at
   const steps = flattenSteps(run.steps)
   // Progress counts the steps whose status is recorded directly (no sub-steps).
-  const statuses = leafSteps(run.steps).map((step) => step.row.status)
+  const liveSteps = steps.filter((step) => !step.row.deleted_at)
+  // A run without steps carries its own result (ADR-018).
+  const statuses = liveSteps.length ? leafSteps(run.steps).map((step) => step.row.status) : [run.row.status]
   const finished = statuses.filter((status) => FINAL_STEP_STATUSES.includes(status)).length
   const passed = statuses.filter((status) => status === 'passed').length
   const runEvidence = ordered.filter((row) => !row.test_step_id)
@@ -103,7 +106,7 @@ export function TestRunPage() {
             {run.row.reference ? <span className="font-mono">{run.row.reference}</span> : null}
             <StatusBadge status={STEP_STATUSES[effectiveStatus(run)]} />
             <span>
-              {finished} of {statuses.length} steps executed · {passed} passed
+              {liveSteps.length ? `${finished} of ${statuses.length} steps executed · ${passed} passed` : 'No steps: result recorded on the test run'}
             </span>
           </span>
         }
@@ -120,8 +123,8 @@ export function TestRunPage() {
         ) : null}
       </section>
 
-      {steps.length === 0 ? (
-        <EmptyState icon={ListChecksIcon} title="No steps yet" description="A manager adds steps to this test run in the protocol's Structure tab." />
+      {liveSteps.length === 0 ? (
+        <RunResultCard key={`${run.row.id}-${run.row.executed_at ?? ''}`} run={run.row} canRecord={canRecord} />
       ) : (
         <div className="space-y-3">
           {withDepth(run.steps).map(({ step, depth }) => (

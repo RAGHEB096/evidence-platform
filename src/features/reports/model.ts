@@ -23,8 +23,17 @@ export interface ReportStep {
   images: ReportImage[]
 }
 
+/** Result recorded on a test run that has no steps (ADR-018). */
+export interface ReportRunResult {
+  expected: string
+  actual: string
+  status: StepStatus
+  comments: string
+}
+
 export interface ReportRun {
   node: TestRunNode
+  result: ReportRunResult | null
   /** Evidence attached to the test run as a whole. */
   images: ReportImage[]
   steps: ReportStep[]
@@ -109,7 +118,11 @@ export function buildReportModel(input: {
         const images = toImages(byRun.get(run.row.id) ?? [])
         const steps = walkSteps(run.steps, 0)
         if (!include && images.length === 0 && steps.length === 0) continue
-        runs.push({ node: run, images, steps })
+        const hasLiveSteps = run.steps.some((step) => !step.row.deleted_at)
+        const result = hasLiveSteps
+          ? null
+          : { expected: run.row.expected_result, actual: run.row.actual_result, status: run.row.status, comments: run.row.comments }
+        runs.push({ node: run, result, images, steps })
       }
       if (!include && runs.length === 0) continue
       functions.push({ node: fn, runs })

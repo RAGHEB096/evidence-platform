@@ -169,6 +169,12 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 
 **Found and fixed by this run:** a report over 50 MB could not be saved to the exports bucket, and because saving came before the download, the user lost the generated file. Now the file is always downloaded and the export always recorded; a copy is saved only when it fits under `EXPORT_SAVE_LIMIT_BYTES` (50 MB), and otherwise the user is told. Smaller runs: 20 images generated in 5.7 s (7 MB).
 
+### Owner feedback after first live use (ADR-018)
+- **First chapter number** per protocol (`chapter_start`, Details tab); numbering everywhere follows it.
+- **Test runs without steps** record expected result, actual result, status and comments (`record_test_run_result`), shown in a "Test run result" card on the run's page and in the Word report; the status rolls up like a step's.
+- **"Execute" renamed "Record results".**
+- Verified locally: unit 77, DB 141 (adds `run-results.test.ts`), E2E 17 (adds `run-results.spec.ts`), lint and build clean.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.

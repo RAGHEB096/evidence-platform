@@ -20,6 +20,7 @@ const AUTHENTICATED_RPCS = [
   'node_counts',
   'protocol_overview',
   'record_step_result',
+  'record_test_run_result',
   'reorder_export_items',
   'reorder_siblings',
   'restore_node',

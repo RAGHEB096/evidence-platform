@@ -42,7 +42,7 @@ test('releasing locks the structure; statuses roll up from sub-steps to the chap
   await page.getByRole('tab', { name: 'Structure' }).click()
 
   // Execution stays open; the parent step follows its sub-steps.
-  await page.getByRole('link', { name: 'Open test run 1.1.1 Test Run 001 for execution' }).click()
+  await page.getByRole('link', { name: 'Record results for test run 1.1.1 Test Run 001' }).click()
   const parent = page.getByRole('region', { name: 'Step 1', exact: true })
   await expect(parent.getByText('Follows its sub-steps')).toBeVisible()
   await record(page, 'Step 1.1', 'Passed')

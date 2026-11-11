@@ -50,8 +50,8 @@ const rows: ProtocolRows = {
     { ...node('f2', 1), chapter_id: 'c2', title: 'Label Printing', description: '' },
   ],
   testRuns: [
-    { ...node('r1', 1), function_id: 'f1', reference: 'TR-001', title: 'Test Run 001', description: '' },
-    { ...node('r2', 1), function_id: 'f2', reference: 'TR-002', title: 'Test Run 002', description: '' },
+    { ...node('r1', 1), function_id: 'f1', reference: 'TR-001', title: 'Test Run 001', description: '', expected_result: '', actual_result: '', status: 'not_started' as const, comments: '', executed_by: null, executed_at: null },
+    { ...node('r2', 1), function_id: 'f2', reference: 'TR-002', title: 'Test Run 002', description: '', expected_result: '', actual_result: '', status: 'not_started' as const, comments: '', executed_by: null, executed_at: null },
   ],
   steps: [
     step('s1', 'r1', 1, null, 'Open the application.'),
@@ -128,6 +128,20 @@ describe('buildReportModel', () => {
     const model = buildReportModel({ tree, evidence: allEvidence, items, includeStepsWithoutEvidence: true })
     expect(model.chapters.map((c) => c.node.row.title)).toEqual(['SMT Line 1', 'Packaging'])
     expect(model.counts).toEqual({ chapters: 2, testRuns: 2, steps: 4, images: 4 })
+  })
+
+  it('carries the recorded result of a test run without steps', () => {
+    const withLoneRun: ProtocolRows = {
+      ...rows,
+      testRuns: [
+        ...rows.testRuns,
+        { ...node('r3', 2), function_id: 'f2', reference: 'TR-003', title: 'Label check', description: '', expected_result: 'Label is legible', actual_result: 'Legible', status: 'passed', comments: '', executed_by: null, executed_at: null },
+      ],
+    }
+    const model = buildReportModel({ tree: buildProtocolTree(withLoneRun), evidence: allEvidence, items, includeStepsWithoutEvidence: true })
+    const runs = model.chapters[1]!.functions[0]!.runs
+    expect(runs.find((r) => r.node.row.id === 'r3')!.result).toEqual({ expected: 'Label is legible', actual: 'Legible', status: 'passed', comments: '' })
+    expect(runs.find((r) => r.node.row.id === 'r2')!.result).toBeNull()
   })
 
   it('is empty when nothing is selected and the option is off', () => {

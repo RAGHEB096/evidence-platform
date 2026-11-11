@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { fieldAria } from '@/components/field-aria'
 import { FormField } from '@/components/FormField'
 import { Button } from '@/components/ui/button'
@@ -14,15 +14,25 @@ import { useStructureMutations } from '@/features/protocols/structure-api'
 import { toUserMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 
-type Values = z.infer<typeof protocolDetailsSchema>
+const detailsSchema = protocolDetailsSchema.extend({
+  chapterStart: z.coerce.number<string>().int('Use a whole number.').min(0, 'At least 0.').max(9999, 'At most 9999.'),
+})
+type Input = z.input<typeof detailsSchema>
+type Values = z.output<typeof detailsSchema>
 
 /** Name, reference, version and description. Editable by managers while the protocol is a draft (ADR-017). */
 export function ProtocolDetailsForm({ protocol, canEdit, createdByName }: { protocol: ProtocolRow; canEdit: boolean; createdByName: string }) {
   const { updateProtocol } = useStructureMutations(protocol.id)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const form = useForm<Values>({
-    resolver: zodResolver(protocolDetailsSchema),
-    values: { reference: protocol.reference, name: protocol.name, version: protocol.version, description: protocol.description },
+  const form = useForm<Input, unknown, Values>({
+    resolver: zodResolver(detailsSchema),
+    values: {
+      reference: protocol.reference,
+      name: protocol.name,
+      version: protocol.version,
+      description: protocol.description,
+      chapterStart: String(protocol.chapter_start),
+    },
   })
   const { errors, isSubmitting, isDirty } = form.formState
   const readOnly = !canEdit
@@ -30,7 +40,8 @@ export function ProtocolDetailsForm({ protocol, canEdit, createdByName }: { prot
   async function onSubmit(values: Values) {
     setSubmitError(null)
     try {
-      await updateProtocol.mutateAsync(values)
+      const { chapterStart, ...details } = values
+      await updateProtocol.mutateAsync({ ...details, chapter_start: chapterStart })
       toast.success('Protocol details saved')
     } catch (error) {
       setSubmitError(toUserMessage(error))
@@ -39,12 +50,15 @@ export function ProtocolDetailsForm({ protocol, canEdit, createdByName }: { prot
 
   return (
     <form className="max-w-2xl space-y-4" onSubmit={form.handleSubmit(onSubmit)} noValidate>
-      <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+      <div className="grid gap-4 sm:grid-cols-[1fr_8rem_10rem]">
         <FormField id="details-reference" label="Reference" error={errors.reference?.message}>
           <Input readOnly={readOnly} {...fieldAria('details-reference', errors.reference?.message)} {...form.register('reference')} />
         </FormField>
         <FormField id="details-version" label="Version" error={errors.version?.message}>
           <Input readOnly={readOnly} {...fieldAria('details-version', errors.version?.message)} {...form.register('version')} />
+        </FormField>
+        <FormField id="details-chapter-start" label="First chapter number" error={errors.chapterStart?.message} hint="Chapters are numbered from here.">
+          <Input type="number" min={0} max={9999} readOnly={readOnly} {...fieldAria('details-chapter-start', errors.chapterStart?.message, 'hint')} {...form.register('chapterStart')} />
         </FormField>
       </div>
       <FormField id="details-name" label="Name" error={errors.name?.message}>

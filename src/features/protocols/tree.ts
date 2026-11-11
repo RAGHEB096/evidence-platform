@@ -26,6 +26,13 @@ export interface TestRunRow extends NodeRowBase {
   reference: string
   title: string
   description: string
+  /** Used when the run has no steps (ADR-018); otherwise its status is derived. */
+  expected_result: string
+  actual_result: string
+  status: StepStatus
+  comments: string
+  executed_by: string | null
+  executed_at: string | null
 }
 
 export interface TestStepRow extends NodeRowBase {
@@ -42,6 +49,8 @@ export interface TestStepRow extends NodeRowBase {
 }
 
 export interface ProtocolRows {
+  /** Number of the first chapter (protocols.chapter_start, ADR-018); 1 when absent. */
+  chapterStart?: number
   chapters: ChapterRow[]
   functions: FunctionRow[]
   testRuns: TestRunRow[]
@@ -100,8 +109,8 @@ function groupBy<T>(items: T[], key: (item: T) => string | null): Map<string | n
  * Numbers the live members of a sibling list 1, 2, 3… after `prefix`.
  * Archived members get null and do not take a number.
  */
-function numbered<T extends NodeRowBase>(rows: T[], prefix: string): { row: T; number: string | null }[] {
-  let count = 0
+function numbered<T extends NodeRowBase>(rows: T[], prefix: string, start = 1): { row: T; number: string | null }[] {
+  let count = start - 1
   return rows.map((row) => {
     if (row.deleted_at) return { row, number: null }
     count += 1
@@ -133,7 +142,7 @@ export function buildProtocolTree(rows: ProtocolRows, options: { includeArchived
       }
     })
 
-  return numbered([...keep(rows.chapters)].sort(byPosition), '').map(({ row: chapter, number: chapterNumber }) => ({
+  return numbered([...keep(rows.chapters)].sort(byPosition), '', rows.chapterStart ?? 1).map(({ row: chapter, number: chapterNumber }) => ({
     type: 'chapter',
     row: chapter,
     number: chapterNumber,
@@ -220,7 +229,8 @@ export function deriveRunStatus(statuses: readonly StepStatus[]): StepStatus {
  */
 export function effectiveStatus(node: TreeNode): StepStatus {
   const live = childrenOf(node).filter((child) => !child.row.deleted_at)
-  if (node.type === 'test_step' && live.length === 0) return node.row.status
+  // Steps without sub-steps, and test runs without steps, carry a recorded status.
+  if ((node.type === 'test_step' || node.type === 'test_run') && live.length === 0) return node.row.status
   return deriveRunStatus(live.map(effectiveStatus))
 }
 

@@ -9,13 +9,14 @@ export interface ProtocolRow {
   description: string
   version: string
   status: ProtocolStatus
+  chapter_start: number
   created_by: string
   created_at: string
   updated_at: string
   deleted_at: string | null
 }
 
-export const PROTOCOL_COLUMNS = 'id, reference, name, description, version, status, created_by, created_at, updated_at, deleted_at'
+export const PROTOCOL_COLUMNS = 'id, reference, name, description, version, status, chapter_start, created_by, created_at, updated_at, deleted_at'
 
 export const protocolKeys = {
   all: ['protocols'] as const,

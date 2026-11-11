@@ -28,7 +28,8 @@ function fieldsFor(type: NodeType) {
   return {
     title: type !== 'test_step',
     reference: type === 'test_run' || type === 'test_step',
-    expected: type === 'test_step',
+    // Test runs use it when they have no steps (ADR-018).
+    expected: type === 'test_step' || type === 'test_run',
   }
 }
 

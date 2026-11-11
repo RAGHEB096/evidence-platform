@@ -14,7 +14,7 @@ test('record results, upload several screenshots with one bad file, preview them
 
   // From the protocol's structure to the execution view.
   await page.goto(`/protocols/${arranged.protocolId}`)
-  await page.getByRole('link', { name: 'Open test run 1.1.1 Test Run 001 for execution' }).click()
+  await page.getByRole('link', { name: 'Record results for test run 1.1.1 Test Run 001' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '1.1.1 Test Run 001' })).toBeVisible()
   await expect(page.getByText('0 of 2 steps executed')).toBeVisible()
 

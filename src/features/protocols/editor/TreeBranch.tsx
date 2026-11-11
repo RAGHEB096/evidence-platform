@@ -4,10 +4,10 @@ import {
   ArrowUpIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClipboardCheckIcon,
   CopyIcon,
   MoreHorizontalIcon,
   PencilIcon,
-  PlayIcon,
   PlusIcon,
   RotateCcwIcon,
 } from 'lucide-react'
@@ -157,7 +157,7 @@ function TreeNodeRow({
           <div className="truncate">
             <NodeTitle node={node} />
           </div>
-          {node.type === 'test_step' && node.row.expected_result ? (
+          {(node.type === 'test_step' || node.type === 'test_run') && node.row.expected_result ? (
             <div className="truncate text-xs text-muted-foreground">Expected: {node.row.expected_result}</div>
           ) : null}
         </div>
@@ -176,9 +176,9 @@ function TreeNodeRow({
 
         {node.type === 'test_run' && !isArchived ? (
           <Button asChild variant="outline" size="sm" className="h-7 shrink-0">
-            <Link to={`/protocols/${node.row.protocol_id}/runs/${node.row.id}`} aria-label={`Open ${label} for execution`}>
-              <PlayIcon aria-hidden="true" />
-              <span className="hidden sm:inline">Execute</span>
+            <Link to={`/protocols/${node.row.protocol_id}/runs/${node.row.id}`} aria-label={`Record results for ${label}`}>
+              <ClipboardCheckIcon aria-hidden="true" />
+              <span className="hidden sm:inline">Record results</span>
             </Link>
           </Button>
         ) : null}

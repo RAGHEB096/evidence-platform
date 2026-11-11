@@ -35,6 +35,7 @@ const run = (functionId: string, position: number, title: string): TestRunRow =>
   reference: '',
   title,
   description: '',
+  expected_result: '', actual_result: '', status: 'not_started' as const, comments: '', executed_by: null, executed_at: null,
 })
 const step = (runId: string, position: number, parent: string | null = null, deleted = false): TestStepRow => ({
   ...base(position, deleted),
@@ -108,6 +109,13 @@ describe('buildProtocolTree', () => {
     expect(steps.map((s) => s.number)).toEqual(['1', '2', '2.1', null, '2.2', '2.2.1'])
   })
 
+  it('starts chapter numbering at the first chapter number set on the protocol', () => {
+    const tree = buildProtocolTree({ ...fixture(), chapterStart: 11 })
+    expect(tree.map((c) => c.number)).toEqual(['11', '12'])
+    expect(tree[0]!.functions[0]!.testRuns[0]!.number).toBe('11.1.1')
+    expect(flattenSteps(tree[0]!.functions[0]!.testRuns[0]!.steps)[0]!.number).toBe('1')
+  })
+
   it('copes with an empty protocol', () => {
     expect(buildProtocolTree({ chapters: [], functions: [], testRuns: [], steps: [] })).toEqual([])
   })
@@ -157,6 +165,16 @@ describe('effectiveStatus', () => {
     // The chapter's second function has no test runs yet, so the chapter is not done.
     expect(effectiveStatus(after.fn)).toBe('passed')
     expect(effectiveStatus(after.chapter)).toBe('in_progress')
+  })
+
+  it('uses the recorded status of a test run without steps, and derives it once steps exist', () => {
+    const rows = fixture()
+    const runs = rows.testRuns
+    const lone = { ...runs[0]!, id: 'lone-run', status: 'failed' as const }
+    const tree = buildProtocolTree({ ...rows, testRuns: [...runs, lone] })
+    const fn = tree[0]!.functions[0]!
+    expect(effectiveStatus(fn.testRuns.find((r) => r.row.id === 'lone-run')!)).toBe('failed')
+    expect(effectiveStatus(fn.testRuns.find((r) => r.row.id !== 'lone-run')!)).toBe('not_started')
   })
 
   it('lists the leaf steps whose status is recorded directly', () => {

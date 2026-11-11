@@ -213,6 +213,12 @@ export async function buildReportDocument(
       for (const run of fn.runs) {
         const reference = run.node.row.reference ? ` (${run.node.row.reference})` : ''
         body.push(new Paragraph({ heading: HeadingLevel.HEADING_3, keepNext: true, children: [new TextRun(`${run.node.number} ${run.node.row.title}${reference}`)] }))
+        if (run.result) {
+          body.push(labelled('Expected result', run.result.expected))
+          body.push(labelled('Actual result', run.result.actual))
+          body.push(labelled('Status', statusText(run.result.status), { bold: true }))
+          if (run.result.comments) body.push(labelled('Comments', run.result.comments))
+        }
         body.push(...(await images(run.images)))
         for (const step of run.steps) {
           body.push(...stepBlock(step))
