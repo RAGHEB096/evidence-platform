@@ -1,12 +1,187 @@
-import { FileTextIcon } from 'lucide-react'
+import { FileTextIcon, PlusIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { useAuth } from '@/auth/useAuth'
+import { FilterSelect, ListToolbar } from '@/components/ListToolbar'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/states/EmptyState'
+import { ErrorState } from '@/components/states/ErrorState'
+import { LoadingState } from '@/components/states/LoadingState'
+import { StatusBadge } from '@/components/StatusBadge'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { roleAtLeast } from '@/domain/roles'
+import { EXPORT_STATUSES } from '@/domain/status'
+import { useProtocols } from '@/features/protocols/api'
+import { useMyRoles } from '@/features/protocols/my-roles'
+import { useExportHistory } from '@/features/reports/api'
+import { DownloadReportButton } from '@/features/reports/DownloadReportButton'
+import { useUserDirectory } from '@/features/users/api'
+import { toUserMessage } from '@/lib/errors'
+import { formatDateTime, matchesSearch } from '@/lib/format'
+
+type StatusFilter = 'all' | 'generated' | 'draft'
+type FileFilter = 'all' | 'saved' | 'not_saved'
 
 export function GeneratedDocumentsPage() {
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const history = useExportHistory()
+  const protocols = useProtocols()
+  const roles = useMyRoles()
+  const directory = useUserDirectory()
+  const [search, setSearch] = useState('')
+  const [protocolFilter, setProtocolFilter] = useState('all')
+  const [status, setStatus] = useState<StatusFilter>('generated')
+  const [file, setFile] = useState<FileFilter>('all')
+  const [chooser, setChooser] = useState(false)
+  const [chosen, setChosen] = useState('')
+
+  const buildable = (protocols.data ?? []).filter((p) => !p.deleted_at && roleAtLeast(roles.data?.get(p.id), 'manager', !!profile?.is_admin))
+  const filtered = useMemo(
+    () =>
+      (history.data ?? []).filter((row) => {
+        if (!matchesSearch(search, row.name, row.protocol?.reference, row.protocol?.name)) return false
+        if (protocolFilter !== 'all' && row.protocol_id !== protocolFilter) return false
+        if (status !== 'all' && row.status !== status) return false
+        if (file === 'saved' && !row.storage_path) return false
+        if (file === 'not_saved' && row.storage_path) return false
+        return true
+      }),
+    [history.data, search, protocolFilter, status, file],
+  )
+
   return (
     <>
-      <PageHeader title="Generated Documents" description="History of Word reports generated from your protocols." />
-      <EmptyState icon={FileTextIcon} title="No documents generated yet" description="Reports generated from the report builder will be listed here." />
+      <PageHeader
+        title="Generated Documents"
+        description="History of Word reports generated from your protocols, with the evidence each one contained."
+        actions={
+          buildable.length ? (
+            <Button onClick={() => setChooser(true)}>
+              <PlusIcon aria-hidden="true" />
+              New report
+            </Button>
+          ) : null
+        }
+      />
+
+      <ListToolbar search={search} onSearch={setSearch} placeholder="Search by report name or protocol">
+        <FilterSelect
+          label="Protocol"
+          value={protocolFilter}
+          onChange={setProtocolFilter}
+          options={[{ value: 'all', label: 'All protocols' }, ...(protocols.data ?? []).map((p) => ({ value: p.id, label: p.reference }))]}
+        />
+        <FilterSelect
+          label="Status"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: 'generated', label: 'Generated' },
+            { value: 'draft', label: 'Drafts' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
+        <FilterSelect
+          label="Saved file"
+          value={file}
+          onChange={setFile}
+          options={[
+            { value: 'all', label: 'Saved or not' },
+            { value: 'saved', label: 'File saved' },
+            { value: 'not_saved', label: 'Not saved' },
+          ]}
+        />
+      </ListToolbar>
+
+      {history.isPending ? (
+        <LoadingState label="Loading reports…" />
+      ) : history.isError ? (
+        <ErrorState message={toUserMessage(history.error)} onRetry={() => void history.refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={FileTextIcon}
+          title={history.data.length === 0 ? 'No reports yet' : 'No reports match'}
+          description={
+            history.data.length === 0
+              ? buildable.length
+                ? 'Start one with “New report”: choose a protocol, select evidence, and generate the Word document.'
+                : 'Reports generated by the managers of your protocols will be listed here.'
+              : 'Change the search or filters to see more.'
+          }
+        />
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Report</TableHead>
+                <TableHead>Protocol</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Generated by</TableHead>
+                <TableHead>Generated</TableHead>
+                <TableHead className="text-right">Images</TableHead>
+                <TableHead>File</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium">
+                    <Link to={`/documents/${row.id}`} className="underline-offset-2 hover:underline">
+                      {row.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">{row.protocol?.reference}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={EXPORT_STATUSES[row.status]} />
+                  </TableCell>
+                  <TableCell>{row.generated_by ? (directory.data?.get(row.generated_by)?.display_name ?? '—') : '—'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatDateTime(row.generated_at)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.image_count ?? '—'}</TableCell>
+                  <TableCell>{row.status === 'generated' ? <DownloadReportButton row={row} /> : <span className="text-sm text-muted-foreground">—</span>}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={chooser} onOpenChange={setChooser}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New report</DialogTitle>
+            <DialogDescription>Choose the protocol to report on. Its current draft selection, if any, is resumed.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="report-protocol">Protocol</Label>
+            <Select value={chosen} onValueChange={setChosen}>
+              <SelectTrigger id="report-protocol" className="w-full">
+                <SelectValue placeholder="Choose a protocol" />
+              </SelectTrigger>
+              <SelectContent>
+                {buildable.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.reference} — {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChooser(false)}>
+              Cancel
+            </Button>
+            <Button disabled={!chosen} onClick={() => void navigate(`/protocols/${chosen}/report`)}>
+              Open report builder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

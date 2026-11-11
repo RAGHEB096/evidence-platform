@@ -75,6 +75,26 @@ export async function arrangeProtocol(api: SupabaseClient, reference: string, st
 
 export const fixture = (name: string) => readFileSync(`tests/fixtures/images/${name}`)
 
+/** Uploads and finalises one evidence file through the real API path. */
+export async function uploadEvidenceApi(
+  api: SupabaseClient,
+  target: { protocolId: string; testRunId: string; testStepId: string | null },
+  fileName: string,
+  bytes: Buffer,
+  mimeType: string,
+  caption = '',
+) {
+  const evidenceId = crypto.randomUUID()
+  const storagePath = `${target.protocolId}/${evidenceId}/${fileName}`
+  const { error } = await api.storage.from('evidence').upload(storagePath, bytes, { contentType: mimeType })
+  if (error) throw error
+  const { error: finalizeError } = await api.functions.invoke('finalize-evidence', {
+    body: { evidenceId, testRunId: target.testRunId, testStepId: target.testStepId, storagePath, originalFilename: fileName, caption },
+  })
+  if (finalizeError) throw finalizeError
+  return evidenceId
+}
+
 /** Fails the test if the page throws an uncaught error. */
 export function failOnPageErrors(page: Page) {
   const errors: string[] = []

@@ -12,7 +12,7 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 3 User management, protocol access | Done | `038d80a` |
 | 4 Protocol editor and hierarchy | Done | `ec5e647` |
 | 5 Execution and evidence upload | Done | `c874834` |
-| 6 Report builder and Word generation | **In progress** (see Next step) | WIP commit |
+| 6 Report builder and Word generation | Done | `9085007` (WIP) + "Phase 6: …" |
 | 7 Dashboard, audit viewer, settings, security review | Not started | |
 | 8 Full test run, clean-up, documentation, deployment | Not started | |
 
@@ -41,6 +41,8 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Phase 6 exit evidence (2026-11-11): `test:db` 92 passed (adds 6 for `finalize_export`, `reorder_export_items`, `copy_export_to_draft`); `test:e2e` 12 passed (adds selecting images from two chapters, single and whole-chapter selection, caption override, reorder, the draft surviving a reload, generation and download, unzipping the .docx, history listing, re-download and contained evidence; the report test then passed 5 runs in a row); unit 66 (adds 13 for the report model and DOCX builder); lint and build clean. **Opened a generated report in Microsoft Word 16 on this machine** (automation, read-only, hidden). Word read it without errors, counted 4 pages and listed the Heading 1–3 paragraphs as expected, and its PDF export showed the layout from SPEC 4.7. The owner should still review a real report in Word, with real screenshots, themselves.
+
 Phase 5 exit evidence (2026-11-11): `test:db` 86 passed (adds 12: finalize-evidence registration and hashing, rejection of renamed/truncated/mismatched files with cleanup, refusal to touch others' or registered objects, path checks, bucket size limit following the setting, `record_step_result` stamping and audit, evidence archive keeping the file); `test:e2e` 11 passed (adds results, a three-file upload with one rejected file, preview with next/previous and keyboard, caption edit, persistence, library search and filter); unit 53 (adds 18 for image validation with real fixtures); typecheck, lint, build clean. Visually checked the execution view and the preview dialog in Chromium.
 
 Phase 4 exit evidence (2026-11-11): `test:db` 74 passed (adds 12 for reorder/archive/restore/duplicate); `test:e2e` 10 passed (adds the editor flow: build all five levels, edit, reorder by button and keyboard drag, duplicate, archive with counts, administrator restore, persistence after sign-out and sign-in; and an unassigned user refused by direct URL); unit 35 (adds tree building, numbering, moves, run-status derivation); typecheck, lint, build clean.
@@ -51,14 +53,14 @@ Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; un
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`), `20261111100500_report_exports.sql` (`reorder_export_items`, `finalize_export`, `copy_export_to_draft`).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
 - Column-level grants decide what API roles may write. Positions, parents, `protocol_id`, `deleted_at`, execution fields, evidence hash/path/uploader and export status are never directly writable.
-- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`, `record_step_result`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`.
+- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`, `record_step_result`, `reorder_export_items`, `finalize_export`, `copy_export_to_draft`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`.
 - Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`), `finalize-evidence`.
-- Still to come: `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
+- Still to come: `dashboard_stats` (Phase 7).
 - Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`, `<type>.duplicated` (with `source_id`).
 
 ## Decisions
@@ -118,28 +120,27 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Evidence Library** filters on the server (search with `ilike` over file name, caption and description; protocol, cascading chapter/function/test run, uploader, date range) and pages 48 at a time. Location names come from PostgREST embeds that name the composite foreign keys explicitly.
 - **Archiving evidence** goes through `archive_node('evidence', id)` (managers and administrators); the file stays in storage.
 
+### Phase 6
+- **One shared draft per protocol:** the builder resumes the protocol's most recent draft, whoever started it, and creates it on the first change (not on opening the page). After generating, `copy_export_to_draft` starts a new draft with the same settings and live selection, so the generated export stays read-only and work can continue.
+- **Report headings keep the protocol's own numbering** (a report that leaves out chapter 1 starts at "2."), so every heading traces back to the app. A parent step appears when one of its sub-steps has selected evidence. Evidence numbers run 001, 002… through the document. Each image also shows its source file name and SHA-256.
+- **Counts:** the browser computes chapters, test runs and steps from the same model that builds the document. `finalize_export` recomputes the image count from the stored live selection and refuses a mismatch (`selection_changed`). Who generated the report and when are stamped by the server.
+- **Images:** fetched through signed URLs refreshed 25 at a time, decoded with `createImageBitmap` (a GIF contributes its first frame), scaled to the long-edge setting, re-encoded as PNG one at a time, and fitted to the printable width and at most two thirds of the page height, never enlarged. docx stores identical image bytes once.
+- **Layout:** the cover sits in its own section without header or footer. The second section holds the information page and the chapters, with the header (title and reference) and "Page X of Y" footer. Only `pageBreakBefore` on chapter headings forces breaks, so there are no blank pages. Arial throughout; A4 by default from the administrator setting (`report_page_size`, constant `DEFAULT_REPORT_PAGE_SIZE`).
+- **Downloads** of saved reports use 60-second signed URLs with a download file name. Generated Documents shows generated reports by default; drafts are behind the status filter.
+- **Selection checkboxes update optimistically**, written to the cache in the same frame as the click; a draft created by the first click inherits the optimistic items before the page switches to it.
+- **Route-level lazy loading** with React Router's `lazy` route property; a thin progress bar shows while a page loads. The main chunk went from 1.08 MB to 485 kB, and `docx` loads only when generating.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
-- Main JS chunk ~1.08 MB (319 kB gzipped) after dnd-kit and the evidence views. Phase 6 adds route-level lazy loading and loads `docx` only on the report screen.
 - Uploads that are uploaded but never finalised (tab closed mid-upload) remain as orphan objects; the cleanup query goes in the README (Phase 8).
 - ADR-001 asks to confirm the synthetic email domain against a hosted project. **Blocked: no hosted Supabase project yet.** It is configurable through `VITE_AUTH_EMAIL_DOMAIN` / `AUTH_EMAIL_DOMAIN`.
 - `evidence_files` rows are inserted directly by test fixtures until `finalize-evidence` exists (Phase 5).
 
+- One run of `report.spec.ts` during Phase 6 reported a failure whose details were filtered out of the log. After the optimistic-selection fix it passed 5 times in a row and in the full suite. Watch for flakiness there.
+- Very large reports (hundreds of high-resolution screenshots) are built entirely in browser memory. Not yet measured; Phase 8 should time a large generation.
+- A stray empty folder tree `F:cUsers…` outside the repo was created during Phase 5 by a screenshot script. It can be deleted.
+
 ## Next step
 
-**Phase 6 is in progress.** Done so far (typecheck, lint and 66 unit tests green; DB and E2E suites not rerun since):
-- Migration `20261111100500_report_exports.sql`: `reorder_export_items`, `finalize_export` (server stamps who and when, checks the image count against the stored live selection, checks a saved file sits at `{protocol}/{export}.docx`), and `copy_export_to_draft`. **Not yet covered by DB tests.**
-- `src/features/reports/model.ts`: `buildReportModel` (selected live evidence only, selection order, parent steps kept for context, "include steps without evidence", protocol numbering kept, sequential evidence numbers, counts).
-- `src/features/reports/docx-builder.ts`: cover page, protocol information page and summary, Heading1–3 built-in styles, chapter page breaks, labelled step details, embedded PNGs fitted to printable width and two thirds of the page height (never enlarged), caption kept with its image, source file and SHA-256 line, header title, "Page X of Y" footer, A4/Letter, Arial throughout. Tested by `tests/unit/report.test.ts`, which unzips the result.
-- `src/features/reports/generate.ts`: browser pipeline (batched signed URLs, decode → scale → PNG one image at a time with progress, dynamic import of `docx`, SHA-256, optional save to the exports bucket, `finalize_export`, download). **Not yet wired to any UI or exercised.**
-
-Remaining for Phase 6:
-1. DB tests for the three export RPCs (role checks, generated export read-only, count mismatch refused, path check).
-2. Report builder page `/protocols/:id/report` (manager+): latest draft per protocol, created lazily on first change; selectable thumbnails; select/clear all per test run and per chapter; caption override; reorder within a step (`reorder_export_items`); remove; sticky summary from `buildReportModel` counts; include option; report name; "save a copy" checkbox; Generate with progress; after generating, `copy_export_to_draft` so work can continue. Add a "Build report" button on the protocol page.
-3. Generated Documents page: history (name, protocol, generated by, timestamp, images, file saved), filters, signed-URL download, detail listing the contained evidence, "New report" protocol chooser.
-4. Route-level `React.lazy` for heavy pages (the bundle is ~1.08 MB).
-5. E2E: select images from two chapters, generate, download, find in history, re-download. Then open one generated .docx in a converter (for example LibreOffice headless, if available) to confirm it is valid.
-6. Update PROGRESS.md and commit "Phase 6: …". Then Phases 7 and 8 as in SPEC.md.
-
-Also note: a stray empty folder tree `F:cUsers…` was created outside the repo by a screenshot script during Phase 5 (a Git Bash path was resolved against drive F:). It contains nothing and can be deleted.
+Phase 7: dashboard (totals, my protocols, recent activity from the audit trail, per-protocol row with chapters, test runs and execution progress, admin storage usage against the plan limit) computed on the server under RLS; audit viewer (administrators everything, managers their protocols; filters by protocol, user, event type and date); Settings (display name and own password for everyone; upload limit, report page size and image long edge for administrators); a security review pass over every table and bucket confirming RLS coverage, plus audit events for every action in SPEC 4.10.

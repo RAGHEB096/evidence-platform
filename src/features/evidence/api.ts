@@ -137,7 +137,7 @@ export function useSignedUrls(paths: string[], bucket: 'evidence' | 'exports' = 
     queryFn: async () => {
       const { data, error } = await getSupabase().storage.from(bucket).createSignedUrls(sorted, SIGNED_URL_TTL_SECONDS)
       if (error) throw error
-      return new Map(data.filter((item) => item.signedUrl && item.path).map((item) => [item.path!, item.signedUrl]))
+      return new Map<string, string>(data.flatMap((item) => (item.signedUrl && item.path ? [[item.path, item.signedUrl] as const] : [])))
     },
   })
 }

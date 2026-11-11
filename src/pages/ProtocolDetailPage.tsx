@@ -1,4 +1,4 @@
-import { ArchiveIcon, ArrowLeftIcon, LockIcon, RotateCcwIcon } from 'lucide-react'
+import { ArchiveIcon, ArrowLeftIcon, FileTextIcon, LockIcon, RotateCcwIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -76,7 +76,16 @@ export function ProtocolDetailPage() {
           </span>
         }
         actions={
-          isAdmin ? (
+          <>
+          {canManage && !isArchived ? (
+            <Button asChild>
+              <Link to={`/protocols/${p.id}/report`}>
+                <FileTextIcon aria-hidden="true" />
+                Build report
+              </Link>
+            </Button>
+          ) : null}
+          {isAdmin ? (
             isArchived ? (
               <Button
                 variant="outline"
@@ -97,7 +106,8 @@ export function ProtocolDetailPage() {
                 Archive protocol
               </Button>
             )
-          ) : null
+          ) : null}
+          </>
         }
       />
       {isArchived ? (

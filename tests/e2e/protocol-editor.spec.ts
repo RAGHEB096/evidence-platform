@@ -130,6 +130,7 @@ test('a user who is not assigned to a protocol is refused it, even by direct add
   await create.getByLabel('Name').fill('Private protocol')
   await create.getByRole('button', { name: 'Create protocol' }).click()
   await page.getByRole('link', { name: 'Private protocol' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Private protocol' })).toBeVisible()
   const protocolUrl = new URL(page.url()).pathname
 
   await page.goto('/users')

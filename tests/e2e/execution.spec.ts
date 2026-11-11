@@ -45,12 +45,14 @@ test('record results, upload several screenshots with one bad file, preview them
   await step1.getByRole('button', { name: /^Open login-page\.png/ }).click()
   const preview = page.getByRole('dialog')
   await expect(preview.getByRole('heading', { name: 'login-page.png' })).toBeVisible()
-  await expect(preview.getByText('1 of 2')).toBeVisible()
+  await expect(preview.getByText(/^[12] of 2$/)).toBeVisible()
   await expect(preview.getByText('64×48 px', { exact: false })).toBeVisible()
   await expect(preview.getByRole('img')).toBeVisible()
-  await preview.getByRole('button', { name: 'Next evidence' }).click()
+  // Uploads run in parallel, so either file may be first; step to the other and back.
+  const first = (await preview.getByText(/^[12] of 2$/).textContent()) === '1 of 2'
+  await preview.getByRole('button', { name: first ? 'Next evidence' : 'Previous evidence' }).click()
   await expect(preview.getByRole('heading', { name: 'result.jpg' })).toBeVisible()
-  await page.keyboard.press('ArrowLeft')
+  await page.keyboard.press(first ? 'ArrowLeft' : 'ArrowRight')
   await expect(preview.getByRole('heading', { name: 'login-page.png' })).toBeVisible()
   await preview.getByLabel('Caption').fill('Screenshot showing the login page.')
   await preview.getByRole('button', { name: 'Save details' }).click()
