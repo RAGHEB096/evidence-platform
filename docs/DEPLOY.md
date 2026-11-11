@@ -109,7 +109,11 @@ Workers & Pages → Create → Pages → Connect to Git → choose the repositor
 - [ ] Check: opening `https://<project>.pages.dev/protocols` directly shows the sign-in page, not a 404.
 - [ ] Go back and set the Auth **Site URL** (step 4) and `ALLOWED_ORIGINS` (step 5) to the final address. Re-run `secrets set` if it changed. Add a custom domain the same way if you use one; it must also be in `ALLOWED_ORIGINS`.
 
-*Alternative (ADR-009):* Workers with static assets instead of Pages. Nothing in the app changes; you would add a `wrangler.jsonc` with `"assets": { "directory": "./dist", "not_found_handling": "single-page-application" }` and deploy with Wrangler.
+**Alternative used for this project (ADR-009): Workers with static assets.** Cloudflare's "Create application" now leads to Workers by default. The repository includes `wrangler.jsonc` for this route (serves `dist/`, SPA fallback):
+- Create a Worker from the Git repository, named exactly **`evidence-platform`** (it must match `name` in `wrangler.jsonc`).
+- Build command `npm run build`, deploy command `npx wrangler deploy`, root directory `/`.
+- Put the four variables above in the Worker's **Settings → Build → Variables and secrets** (build variables, because Vite bakes them in at build time), then redeploy.
+- The address is `https://evidence-platform.<your-subdomain>.workers.dev`. Use it for `ALLOWED_ORIGINS` and the Auth Site URL.
 
 ## 8. Free-tier limits and when to upgrade
 

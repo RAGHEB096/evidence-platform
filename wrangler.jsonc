@@ -1,0 +1,11 @@
+// Cloudflare Workers with static assets (ADR-009): serves the built SPA from
+// dist/. No Worker script; unknown paths get index.html so the client router
+// handles them. The name must match the Worker created in the dashboard.
+{
+  "name": "evidence-platform",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist/",
+    "not_found_handling": "single-page-application"
+  }
+}
