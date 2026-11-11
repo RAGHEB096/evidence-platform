@@ -8,8 +8,8 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 |---|---|---|
 | 0 Inspect, plan | Done (plan approved 2026-11-11) | — |
 | 1 Project setup, layout, routing, Supabase client, local Supabase | Done | `a30798c` |
-| 2 Schema, migrations, RLS, username auth, first-admin setup | Done | "Phase 2: …" |
-| 3 User management, protocol access | Not started | |
+| 2 Schema, migrations, RLS, username auth, first-admin setup | Done | `34292d7` |
+| 3 User management, protocol access | Done | `038d80a` |
 | 4 Protocol editor and hierarchy | Not started | |
 | 5 Execution and evidence upload | Not started | |
 | 6 Report builder and Word generation | Not started | |
@@ -41,16 +41,19 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Phase 3 exit evidence (2026-11-11): `test:db` 62 passed (adds 11 for `admin-users`); `test:e2e` 8 passed (adds creating a user, granting and changing a role, the user signing in through the forced password change, deactivation blocking them, and the no-access empty state); unit 19; typecheck, lint, build clean.
+
 Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; unit tests 19 passed; typecheck, lint and build clean. Mutation check: loosening the protocol update policy to viewers made 2 RLS tests fail, as expected.
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit) and `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
 - Column-level grants decide what API roles may write. Positions, parents, `protocol_id`, `deleted_at`, execution fields, evidence hash/path/uploader and export status are never directly writable.
-- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`.
+- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`.
+- Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`).
 - Still to come: `record_step_result` and `svc_register_evidence` (Phase 5); `reorder_siblings`, `duplicate_node`, `archive_node`, `restore_node` (Phase 4); `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
 - Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`.
 
@@ -84,14 +87,21 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Sign-in** is username → normalised (trim, lowercase) → synthetic email → `signInWithPassword`. Any failure, including an inactive profile, shows "Incorrect username or password, or the account is not active."
 - **Test isolation:** both DB and E2E suites reset the local database. DB tests bootstrap an administrator through the real function in global setup; E2E runs setup through the UI in a `setup` project that the others depend on, and saves the session to `playwright/.auth/` (git-ignored).
 
+### Phase 3
+- **All account changes go through `admin-users`**, including flags and display name, so each is attributed to the acting administrator (ADR-013). Protocol access is ordinary table writes that RLS restricts to administrators; the trigger audits them with `auth.uid()`.
+- **Deactivation order:** the database flag goes first (it enforces the last-administrator rule and closes RLS at once), then the Auth ban. If the ban fails, the user is told to retry; the account is already inert. Reactivation lifts the ban first, then sets the flag.
+- **Usernames cannot be changed**, because they identify the account in the audit trail. Display names can.
+- **The initial password is generated in the browser** (14 characters, no ambiguous characters) and shown once in the dialog for the administrator to hand over. It is never stored outside Supabase Auth.
+- **Protocols list and "Create protocol" were built in Phase 3**, because assigning access needs protocols to exist. The list filters by status; administrators can also filter for archived protocols.
+- **User Management:** a list with search and status/permission filters, plus a detail page (`/users/:id`) with edit, reset password, deactivate/reactivate, and a protocol-access table where roles are added, changed and removed.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
 - Main JS chunk ~590 kB (185 kB gzipped). Add route-level lazy loading as pages grow; load `docx` only on the report screen (Phase 6).
 - ADR-001 asks to confirm the synthetic email domain against a hosted project. **Blocked: no hosted Supabase project yet.** It is configurable through `VITE_AUTH_EMAIL_DOMAIN` / `AUTH_EMAIL_DOMAIN`.
 - `evidence_files` rows are inserted directly by test fixtures until `finalize-evidence` exists (Phase 5).
-- The `admin-users` Edge Function and the user-management UI are Phase 3. Tests drive the same service RPCs and Auth admin calls directly.
 
 ## Next step
 
-Phase 3: `admin-users` Edge Function (create, reset password, activate/deactivate with Auth ban, flags), User Management UI (list, create, flags, protocol access with roles), role tests for every role, E2E for creating a user and signing in as them.
+Phase 4: protocol detail page and editor with the full tree (chapter → function → test run → step → sub-steps): add, edit, archive with descendant counts, reorder by drag and drop and by up/down buttons, duplicate, administrator restore of archived items, protocol details editing. RPCs `reorder_siblings`, `duplicate_node`, `archive_node`, `restore_node` with DB tests. E2E for the editor, persistence after sign-out, and a second user being refused an unassigned protocol.
