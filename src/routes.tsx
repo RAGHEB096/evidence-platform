@@ -11,6 +11,7 @@ import { ProtocolsPage } from '@/pages/ProtocolsPage'
 import { RouteErrorPage } from '@/pages/RouteErrorPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
+import { UserDetailPage } from '@/pages/UserDetailPage'
 import { UsersPage } from '@/pages/UsersPage'
 
 export const routes: RouteObject[] = [
@@ -38,7 +39,13 @@ export const routes: RouteObject[] = [
               { path: 'protocols', element: <ProtocolsPage /> },
               { path: 'evidence', element: <EvidenceLibraryPage /> },
               { path: 'documents', element: <GeneratedDocumentsPage /> },
-              { element: <RequireAdmin />, children: [{ path: 'users', element: <UsersPage /> }] },
+              {
+                element: <RequireAdmin />,
+                children: [
+                  { path: 'users', element: <UsersPage /> },
+                  { path: 'users/:userId', element: <UserDetailPage /> },
+                ],
+              },
               { path: 'settings', element: <SettingsPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],
