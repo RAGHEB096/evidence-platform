@@ -211,7 +211,8 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Open, found by those checks:**
   1. Hosted Auth rejected `users.example.com` (`email_address_invalid`), the ADR-001 risk. **Owner chose `ragheb096.github.io`** (their GitHub Pages domain, no mail server). It is set in `AUTH_EMAIL_DOMAIN` (verified by digest) and must also be the Cloudflare variable `VITE_AUTH_EMAIL_DOMAIN`. Acceptance is confirmed only by first-time setup on the live site; if refused, setup now reports `auth_domain_rejected`.
   2. Public sign-up is still enabled in the hosted Auth settings (the project default). The owner must disable it (DEPLOY.md step 4), together with the other Auth settings.
-- **Not started:** Cloudflare Pages (owner needs an account), Auth settings, first-time setup, unsetting the setup token, live smoke test.
+- **Cloudflare:** deployed as a Worker with static assets (ADR-009 alternative; Cloudflare's dashboard now defaults to Workers), using `wrangler.jsonc`, at https://evidence-platform.baouandi-r.workers.dev. The first build lacked the `VITE_*` variables (they were added as runtime variables, which static-asset Workers reject); they belong in Settings → Build → Variables and secrets. `ALLOWED_ORIGINS` now includes the live address, and the CORS preflight from it was verified.
+- **Not yet done:** Auth settings confirmed by the owner, first-time setup on the live site, unsetting the setup token, live smoke test.
 
 ## Next step
 
