@@ -47,6 +47,15 @@ export function authAdminError(error: { message?: string; code?: string; status?
   if (code === 'email_exists' || code === 'user_already_exists' || /already (been )?registered/i.test(error.message ?? '')) {
     return new UserFacingError(409, 'That username is already taken.', 'username_taken')
   }
+  if (code === 'email_address_invalid') {
+    // The synthetic domain (AUTH_EMAIL_DOMAIN) is refused by Supabase Auth (ADR-001).
+    console.error('[auth-admin] AUTH_EMAIL_DOMAIN rejected by Supabase Auth', error)
+    return new UserFacingError(
+      500,
+      'The server’s sign-in domain setting is not accepted by Supabase Auth. Change AUTH_EMAIL_DOMAIN and VITE_AUTH_EMAIL_DOMAIN (see docs/DEPLOY.md, step 5).',
+      'auth_domain_rejected',
+    )
+  }
   if (code === 'weak_password') {
     return new UserFacingError(400, 'The password is too weak. Use at least 10 characters with letters and digits.', 'weak_password')
   }

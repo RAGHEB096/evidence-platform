@@ -203,6 +203,16 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 | 15 | Reachable at a public URL and passes the smoke test there | **Blocked**: needs the owner's GitHub, Supabase and Cloudflare accounts | — |
 | 16 | A generated report looks right in Microsoft Word | **Needs the owner** | Opened by automation only; the owner should open a report built from real screenshots in Word |
 
+## Deployment status (2026-11-11)
+
+- **GitHub:** pushed to https://github.com/RAGHEB096/evidence-platform (private). History scanned first: only the `.env.example` files, no secrets.
+- **Supabase project** `etwtckdfckpbjzdvfqkz` (Frankfurt, Postgres 17): linked; 9 migrations applied with `db push --remote`; secrets `SETUP_TOKEN`, `AUTH_EMAIL_DOMAIN` and `ALLOWED_ORIGINS` set from the git-ignored `supabase/functions/.env.production`; three functions deployed, active, `verify_jwt` off.
+- **Live checks (read-only or refused calls):** `needs_setup` true; anonymous `create_protocol` 401; anonymous table read refused (42501); `bootstrap-admin` refuses a wrong token with the expected message.
+- **Open, found by those checks:**
+  1. Hosted Auth rejects `users.example.com` (`email_address_invalid`), the ADR-001 risk. A domain Supabase accepts must be chosen (proposed: one the owner controls, e.g. `ragheb096.github.io`) and set in `AUTH_EMAIL_DOMAIN` and `VITE_AUTH_EMAIL_DOMAIN`. The functions now report this case explicitly (`auth_domain_rejected`). The anonymous key cannot test acceptance without creating accounts, so first-time setup will be the test.
+  2. Public sign-up is still enabled in the hosted Auth settings (the project default). The owner must disable it (DEPLOY.md step 4), together with the other Auth settings.
+- **Not started:** Cloudflare Pages (owner needs an account), Auth settings, first-time setup, unsetting the setup token, live smoke test.
+
 ## Next step
 
-Deployment by the owner, following docs/DEPLOY.md (or give Claude CLI access to Supabase and Cloudflare to deploy and run the smoke test against the live URL). On the hosted project, confirm the synthetic email domain is accepted (ADR-001), then record the live URL and smoke-test date here.
+Owner: disable sign-ups and apply the other Auth settings (DEPLOY.md step 4); choose the email domain; create a Cloudflare account. Then: set the domain secret, create the Pages project, add its address to `ALLOWED_ORIGINS` and the Auth Site URL, run first-time setup on the live site, unset `SETUP_TOKEN`, and run the smoke test.
