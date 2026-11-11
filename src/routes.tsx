@@ -12,6 +12,7 @@ import { ProtocolsPage } from '@/pages/ProtocolsPage'
 import { RouteErrorPage } from '@/pages/RouteErrorPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SetupPage } from '@/pages/SetupPage'
+import { TestRunPage } from '@/pages/TestRunPage'
 import { UserDetailPage } from '@/pages/UserDetailPage'
 import { UsersPage } from '@/pages/UsersPage'
 
@@ -39,6 +40,7 @@ export const routes: RouteObject[] = [
               { index: true, element: <DashboardPage /> },
               { path: 'protocols', element: <ProtocolsPage /> },
               { path: 'protocols/:protocolId', element: <ProtocolDetailPage /> },
+              { path: 'protocols/:protocolId/runs/:runId', element: <TestRunPage /> },
               { path: 'evidence', element: <EvidenceLibraryPage /> },
               { path: 'documents', element: <GeneratedDocumentsPage /> },
               {

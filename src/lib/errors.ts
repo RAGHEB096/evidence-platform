@@ -18,6 +18,8 @@ const HINT_MESSAGES: Record<string, string> = {
   not_archived: 'This item is not archived.',
   archived: 'Archived items cannot be changed or duplicated.',
   not_found: 'The item was not found, or you do not have access to it.',
+  too_long: 'Results and comments are at most 10,000 characters.',
+  step_mismatch: 'The step does not belong to this test run.',
 }
 
 const GENERIC = 'Something went wrong. Try again; if it keeps happening, tell your administrator.'

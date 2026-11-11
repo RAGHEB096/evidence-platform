@@ -167,7 +167,11 @@ export const TINY_PNG = Buffer.from(
   'base64',
 )
 
-/** Registers an evidence row directly (Phase 5 replaces this with finalize-evidence). */
+/**
+ * Registers an evidence row directly, as server code would, for tests that
+ * need evidence but are not about upload. tests/db/evidence.test.ts covers the
+ * real path through finalize-evidence.
+ */
 export async function insertEvidence(h: Hierarchy, uploadedBy: string, options: { withStep?: boolean } = {}) {
   const id = randomUUID()
   const storagePath = `${h.protocolId}/${id}/screenshot.png`

@@ -7,10 +7,12 @@ import {
   CopyIcon,
   MoreHorizontalIcon,
   PencilIcon,
+  PlayIcon,
   PlusIcon,
   RotateCcwIcon,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -168,6 +170,15 @@ function TreeNodeRow({
               <ArrowDownIcon aria-hidden="true" />
             </Button>
           </div>
+        ) : null}
+
+        {node.type === 'test_run' && !isArchived ? (
+          <Button asChild variant="outline" size="sm" className="h-7 shrink-0">
+            <Link to={`/protocols/${node.row.protocol_id}/runs/${node.row.id}`} aria-label={`Open ${label} for execution`}>
+              <PlayIcon aria-hidden="true" />
+              <span className="hidden sm:inline">Execute</span>
+            </Link>
+          </Button>
         ) : null}
 
         {editable ? (

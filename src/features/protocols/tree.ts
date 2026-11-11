@@ -180,6 +180,18 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
   return next
 }
 
+/** A live test run with its chapter and function, or null if it is not in the (live) tree. */
+export function findTestRun(rows: ProtocolRows | undefined, testRunId: string): { chapter: ChapterNode; fn: FunctionNode; run: TestRunNode } | null {
+  if (!rows) return null
+  for (const chapter of buildProtocolTree(rows)) {
+    for (const fn of chapter.functions) {
+      const run = fn.testRuns.find((candidate) => candidate.row.id === testRunId)
+      if (run) return { chapter, fn, run }
+    }
+  }
+  return null
+}
+
 /** Every step in a run, depth-first in display order. */
 export function flattenSteps(steps: StepNode[]): StepNode[] {
   return steps.flatMap((step) => [step, ...flattenSteps(step.children)])

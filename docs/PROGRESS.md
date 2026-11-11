@@ -10,8 +10,8 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 1 Project setup, layout, routing, Supabase client, local Supabase | Done | `a30798c` |
 | 2 Schema, migrations, RLS, username auth, first-admin setup | Done | `34292d7` |
 | 3 User management, protocol access | Done | `038d80a` |
-| 4 Protocol editor and hierarchy | Done | "Phase 4: …" |
-| 5 Execution and evidence upload | Not started | |
+| 4 Protocol editor and hierarchy | Done | `ec5e647` |
+| 5 Execution and evidence upload | Done | "Phase 5: …" |
 | 6 Report builder and Word generation | Not started | |
 | 7 Dashboard, audit viewer, settings, security review | Not started | |
 | 8 Full test run, clean-up, documentation, deployment | Not started | |
@@ -41,6 +41,8 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Phase 5 exit evidence (2026-11-11): `test:db` 86 passed (adds 12: finalize-evidence registration and hashing, rejection of renamed/truncated/mismatched files with cleanup, refusal to touch others' or registered objects, path checks, bucket size limit following the setting, `record_step_result` stamping and audit, evidence archive keeping the file); `test:e2e` 11 passed (adds results, a three-file upload with one rejected file, preview with next/previous and keyboard, caption edit, persistence, library search and filter); unit 53 (adds 18 for image validation with real fixtures); typecheck, lint, build clean. Visually checked the execution view and the preview dialog in Chromium.
+
 Phase 4 exit evidence (2026-11-11): `test:db` 74 passed (adds 12 for reorder/archive/restore/duplicate); `test:e2e` 10 passed (adds the editor flow: build all five levels, edit, reorder by button and keyboard drag, duplicate, archive with counts, administrator restore, persistence after sign-out and sign-in; and an unassigned user refused by direct URL); unit 35 (adds tree building, numbering, moves, run-status derivation); typecheck, lint, build clean.
 
 Phase 3 exit evidence (2026-11-11): `test:db` 62 passed (adds 11 for `admin-users`); `test:e2e` 8 passed (adds creating a user, granting and changing a role, the user signing in through the forced password change, deactivation blocking them, and the no-access empty state); unit 19; typecheck, lint, build clean.
@@ -49,14 +51,14 @@ Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; un
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`), `20261111100400_execution_and_evidence.sql` (`record_step_result`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
 - Column-level grants decide what API roles may write. Positions, parents, `protocol_id`, `deleted_at`, execution fields, evidence hash/path/uploader and export status are never directly writable.
-- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`.
-- Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`).
-- Still to come: `record_step_result` and `svc_register_evidence` (Phase 5); `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
+- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`, `record_step_result`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`, `svc_check_protocol_role`, `svc_evidence_object`, `svc_register_evidence`.
+- Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`), `finalize-evidence`.
+- Still to come: `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
 - Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`, `<type>.duplicated` (with `source_id`).
 
 ## Decisions
@@ -106,13 +108,24 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Not-assigned protocols** show "Protocol not available", which does not reveal whether the protocol exists.
 - **Protocol detail page** (`/protocols/:id`) has Structure, Details (managers edit; others read-only) and Team (managers and administrators) tabs; administrators archive and restore the protocol from the header.
 
+### Phase 5
+- **Evidence finalisation safeguards:** see ADR-016 (caller role, exact path, caller-owned unregistered object, shared validator, bounded buffering).
+- **One validator, two runtimes:** `supabase/functions/_shared/image-format.ts` has no imports and runs in Vite and Deno. The `@shared` alias points there from the app (vite, vitest and tsconfig).
+- **Image fixtures** in `tests/fixtures/images/` are real files: PNG, JPEG and WEBP rendered by Chromium, plus minimal valid GIF and BMP. Regenerate them with `node scripts/make-image-fixtures.mjs tests/fixtures/images`.
+- **Upload:** each file is checked in the browser first (reading at most limit + 1 bytes), then uploaded with `XMLHttpRequest` for per-file progress, three at a time, then finalised. A rejection never stops the others. Messages always start with the file name.
+- **Results** are saved per step with an explicit "Save result" (marked when there are unsaved changes) through `record_step_result`, which stamps `executed_by`/`executed_at` and records nothing when the values are unchanged. Run status is derived (`deriveRunStatus`), never stored.
+- **Evidence display** uses short-lived signed URLs (5 minutes, fetched in one batch per list and refreshed before expiry), with originals scaled by CSS and lazy-loaded. Thumbnails are not generated (ARCHITECTURE section 8).
+- **Evidence Library** filters on the server (search with `ilike` over file name, caption and description; protocol, cascading chapter/function/test run, uploader, date range) and pages 48 at a time. Location names come from PostgREST embeds that name the composite foreign keys explicitly.
+- **Archiving evidence** goes through `archive_node('evidence', id)` (managers and administrators); the file stays in storage.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
-- Main JS chunk ~590 kB (185 kB gzipped). Add route-level lazy loading as pages grow; load `docx` only on the report screen (Phase 6).
+- Main JS chunk ~1.08 MB (319 kB gzipped) after dnd-kit and the evidence views. Phase 6 adds route-level lazy loading and loads `docx` only on the report screen.
+- Uploads that are uploaded but never finalised (tab closed mid-upload) remain as orphan objects; the cleanup query goes in the README (Phase 8).
 - ADR-001 asks to confirm the synthetic email domain against a hosted project. **Blocked: no hosted Supabase project yet.** It is configurable through `VITE_AUTH_EMAIL_DOMAIN` / `AUTH_EMAIL_DOMAIN`.
 - `evidence_files` rows are inserted directly by test fixtures until `finalize-evidence` exists (Phase 5).
 
 ## Next step
 
-Phase 5: execution view for a test run (actual result, status, comments per step; derived run status) through `record_step_result`; `finalize-evidence` Edge Function and `svc_register_evidence`; multi-file upload with per-file progress and validation (extension, MIME, magic bytes, size from settings); thumbnails via signed URLs; preview with next/previous; caption/description editing by role; evidence archive; Evidence Library with search and filters. Unit tests for file validation (renamed non-image, truncated image).
+Phase 6: report builder (choose protocol; browse chapters/functions/runs with evidence; select per image, per run, per chapter; preview; caption overrides; reorder within a step; remove; sticky summary; "include steps without evidence"; draft saved as it changes), DOCX generation in the browser with `docx` (cover, information page, numbered headings with built-in styles, sequential evidence numbering, embedded scaled PNGs with captions kept with images, chapter page breaks, header and "Page X of Y" footer, A4 constant, progress for hundreds of images), `finalize_export` RPC, optional save to the exports bucket, Generated Documents history with re-download and contained evidence. DOCX unit tests from fixtures (unzip, headings, media count, only selected evidence). Lazy-load routes and `docx`.

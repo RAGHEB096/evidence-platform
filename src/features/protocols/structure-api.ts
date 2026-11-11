@@ -36,6 +36,7 @@ export function useProtocol(protocolId: string) {
 export function useProtocolRows(protocolId: string) {
   return useQuery({
     queryKey: structureKeys.rows(protocolId),
+    enabled: !!protocolId,
     queryFn: async (): Promise<ProtocolRows> => {
       const supabase = getSupabase()
       const [chapters, functions, testRuns, steps] = await Promise.all([
