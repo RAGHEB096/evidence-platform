@@ -22,7 +22,8 @@ Read all three at the start of every session before changing anything.
 Set these up in Phase 1 and keep this list accurate as scripts change.
 
 - `npm run dev`, `npm run build`, `npm run typecheck`, `npm run lint`
-- `npm test` (unit), `npm run test:db` (RLS and RPC tests against local Supabase), `npm run test:e2e` (Playwright)
+- `npm test` (unit), `npm run test:db` (RLS and RPC tests against local Supabase), `npm run test:e2e` (Playwright), `npm run test:perf` (large-report timing, `PERF_IMAGES`, default 300)
+- `test:db`, `test:e2e` and `test:perf` reset the local database first. Apply a new migration without losing data with `npx supabase migration up`.
 - `npx supabase start`, `npx supabase db reset`, `npx supabase functions serve` (the CLI is a pinned devDependency, not a global install; Docker must be running)
 - `npx playwright install chromium` once per machine before the first `npm run test:e2e`
 

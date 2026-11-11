@@ -155,7 +155,7 @@ export function ReportBuilderPage() {
     setProgress({ phase: 'images', done: 0, total: model.counts.images })
     try {
       const name = (id: string) => directory.data?.get(id)?.display_name ?? 'Unknown user'
-      const { blob, fileName } = await generateReport({
+      const { blob, fileName, saveProblem } = await generateReport({
         exportId,
         protocolId,
         reference: p.reference,
@@ -178,7 +178,8 @@ export function ReportBuilderPage() {
         onProgress: setProgress,
       })
       downloadBlob(blob, fileName)
-      toast.success('Report generated', { description: saveCopy ? `${fileName} downloaded and saved to Generated Documents.` : `${fileName} downloaded.` })
+      if (saveProblem) toast.warning('Report generated, copy not saved', { description: saveProblem, duration: 20_000 })
+      else toast.success('Report generated', { description: saveCopy ? `${fileName} downloaded and saved to Generated Documents.` : `${fileName} downloaded.` })
       await mutations.continueInNewDraft.mutateAsync({ exportId, name: draft.data!.name })
     } catch (error) {
       setGenerationError(error instanceof Error && !('code' in error) ? error.message : toUserMessage(error))

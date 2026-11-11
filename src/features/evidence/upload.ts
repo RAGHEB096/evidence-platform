@@ -9,6 +9,8 @@ export interface UploadTarget {
   testStepId: string | null
 }
 
+const FINALIZE_ATTEMPTS = 4
+
 export type UploadPhase = 'checking' | 'rejected' | 'queued' | 'uploading' | 'verifying' | 'done' | 'failed'
 
 /** Client-side check before any byte leaves the browser. Returns null when the file is acceptable. */
@@ -62,12 +64,27 @@ export async function uploadEvidence(file: File, target: UploadTarget, onProgres
 
   onProgress(1)
   onVerifying()
-  await invokeFunction('finalize-evidence', {
-    evidenceId,
-    testRunId: target.testRunId,
-    testStepId: target.testStepId,
-    storagePath,
-    originalFilename: file.name,
-  })
+  const body = { evidenceId, testRunId: target.testRunId, testStepId: target.testStepId, storagePath, originalFilename: file.name }
+  await finalizeWithRetry(() => invokeFunction('finalize-evidence', body))
   return evidenceId
+}
+
+/**
+ * The function runtime can answer 5xx under load (seen locally as 503).
+ * Finalisation is safe to repeat: if an earlier attempt registered the file
+ * but its answer was lost, a retry reports already_registered, which counts
+ * as success. Other errors (invalid image, no permission) are not retried.
+ */
+export async function finalizeWithRetry(call: () => Promise<unknown>, delayMs = 500): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await call()
+      return
+    } catch (error) {
+      if (attempt > 1 && error instanceof ActionError && error.code === 'already_registered') return
+      const transient = error instanceof ActionError && (error.status === 0 || (error.status ?? 0) >= 500)
+      if (!transient || attempt >= FINALIZE_ATTEMPTS) throw error
+      await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** (attempt - 1)))
+    }
+  }
 }

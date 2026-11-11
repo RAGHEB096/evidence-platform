@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { functionErrorMessage } from '@/lib/errors'
 import { getSupabase } from '@/lib/supabase'
 
@@ -6,6 +7,8 @@ export class ActionError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    /** HTTP status; 0 when the server could not be reached. */
+    readonly status?: number,
   ) {
     super(message)
   }
@@ -15,8 +18,9 @@ export class ActionError extends Error {
 export async function invokeFunction<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await getSupabase().functions.invoke<T>(name, { body })
   if (error) {
+    const status = error instanceof FunctionsHttpError ? (error.context as Response).status : 0
     const { message, code } = await functionErrorMessage(error)
-    throw new ActionError(message, code)
+    throw new ActionError(message, code, status)
   }
   return data as T
 }

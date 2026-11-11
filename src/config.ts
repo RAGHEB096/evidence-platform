@@ -25,5 +25,8 @@ export const DEFAULT_IMAGE_LONG_EDGE_PX = 2000
  */
 export const STORAGE_PLAN_LIMIT_BYTES = 1024 * 1024 * 1024
 
+/** Largest report that can be saved to Generated Documents: the exports bucket's limit (Supabase Free per-file maximum). */
+export const EXPORT_SAVE_LIMIT_BYTES = 50 * 1024 * 1024
+
 /** Lifetime of signed URLs used to display or fetch private files. */
 export const SIGNED_URL_TTL_SECONDS = 300

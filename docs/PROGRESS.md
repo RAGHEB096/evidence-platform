@@ -14,8 +14,8 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 5 Execution and evidence upload | Done | `c874834` |
 | 6 Report builder and Word generation | Done | `9085007` (WIP), `631e647` |
 | 6b Owner feedback: release lock, status roll-up | Done | `d2b3e01` |
-| 7 Dashboard, audit viewer, settings, security review | Done | "Phase 7: …" |
-| 8 Full test run, clean-up, documentation, deployment | Not started | |
+| 7 Dashboard, audit viewer, settings, security review | Done | `8ff2cf1` |
+| 8 Full test run, clean-up, documentation, deployment | Done except deployment (needs owner accounts) | "Phase 8: …" |
 
 ## Environment (this machine)
 
@@ -41,6 +41,8 @@ npm run test:e2e    # reset → setup via UI → sign-in tests → shell (produc
 npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
+
+Phase 8 final run (2026-11-11): typecheck and lint clean; `npm test` 74 passed; `npm run test:db` 135 passed; `npm run test:e2e` 16 passed; `npm run build` clean (no chunk warnings); `npm run test:perf` with 300 images passed (see Performance).
 
 Phase 7 exit evidence (2026-11-11): `test:db` 135 passed (adds `dashboard.test.ts` for figures per role and anonymous refusal, `security.test.ts` for the review checks, `audit-coverage.test.ts` for every SPEC 4.10 action with its actor); `test:e2e` 16 passed (adds dashboard progress and storage, audit filter and change details, admin limits persisting and validation, a user changing display name and password); unit 70; lint and build clean, with no chunk warnings after lazy-loading every page except sign-in. Dashboard and audit trail checked visually. Review record: `docs/SECURITY-REVIEW.md`.
 
@@ -147,6 +149,26 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Security review:** see `docs/SECURITY-REVIEW.md`. One real finding fixed: `anon` could execute public RPCs because PostgreSQL's EXECUTE grant to PUBLIC is global. Pinned by tests.
 - **Lazy loading:** every page except sign-in, setup and change-password loads on demand; the main chunk is ~500 kB (React, router, supabase-js, UI kit).
 
+### Phase 8
+- **`npm run test:perf`** (`playwright.perf.config.ts`, `tests/perf/large-report.spec.ts`) shares the E2E build, reset and setup, uploads `PERF_IMAGES` distinct full-HD screenshots through the real upload path, selects them all, generates the report in the browser and prints timings. Not part of `test:e2e`. Results are under "Performance" below.
+- **Evidence finalisation retries** transient failures: 5xx or unreachable, up to 4 attempts with 0.5/1/2 s backoff. "Already registered" on a retry counts as success, because the earlier attempt had worked and only its answer was lost. Found by the performance run: the local function runtime returned 503 under 8 concurrent finalisations, which previously meant a failed upload plus an orphan file. Rejections (invalid image, no permission) are never retried. Unit-tested in `tests/unit/upload-retry.test.ts`.
+- **README.md** and **docs/DEPLOY.md** written. Free-tier figures were taken from supabase.com/pricing, the Supabase Edge Function limits page and the Cloudflare Pages limits page on 2026-11-11. DEPLOY.md sets Auth settings by hand in the dashboard rather than with `supabase config push`, which would also push local values such as the localhost Site URL.
+- **Deployment not performed:** it needs the owner's GitHub, Supabase and Cloudflare accounts (SPEC section 2). Everything up to that point is prepared.
+
+## Performance (Phase 8)
+
+`npm run test:perf` on this machine (Windows 11, local Supabase in Docker, headless Chromium), 2026-11-11, 300 distinct 1920×1080 PNG screenshots, average 426 kB:
+
+| Measure | Result |
+|---|---|
+| Upload and finalise 300 files (8 in parallel) | 26.6 s, 0 retries (an earlier run needed retries: runtime 503 at image 155 before the retry fix) |
+| Generate the report in the browser (300 images) | 44.3 s |
+| .docx size | 111.2 MB, 300 embedded media files |
+| JavaScript heap after generation | ~415 MB (renderer process ~815 MB during generation) |
+| Microsoft Word 16 opening it (read-only, automation) | 2.3 s, 157 pages, 300 inline images |
+
+**Found and fixed by this run:** a report over 50 MB could not be saved to the exports bucket, and because saving came before the download, the user lost the generated file. Now the file is always downloaded and the export always recorded; a copy is saved only when it fits under `EXPORT_SAVE_LIMIT_BYTES` (50 MB), and otherwise the user is told. Smaller runs: 20 images generated in 5.7 s (7 MB).
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
@@ -156,9 +178,31 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 
 - One run of `report.spec.ts` during Phase 6 reported a failure whose details were filtered out of the log. After the optimistic-selection fix it passed 5 times in a row and in the full suite. Watch for flakiness there.
 - The test suites share the local database with manual use, so running them wipes the owner's local data. Separating them (a second local stack or schema) is proposed as the next step.
-- Very large reports (hundreds of high-resolution screenshots) are built entirely in browser memory. Not yet measured; Phase 8 should time a large generation.
+- Reports over 50 MB (about 100–120 full-HD screenshots) cannot be saved to Generated Documents on the Free plan; they are downloaded and recorded without a file. Raising this needs a paid plan and a migration raising the exports bucket limit.
+- Edge Function code is not typechecked or linted in CI (Deno is not installed); it is exercised by the DB and E2E suites.
 - A stray empty folder tree `F:cUsers…` outside the repo was created during Phase 5 by a screenshot script. It can be deleted.
+
+## Definition of done (SPEC section 9), 2026-11-11
+
+| # | Item | State | How checked |
+|---|---|---|---|
+| 1 | Administrator signs in with username and password, no email anywhere | Verified | E2E setup and sign-in; the page text is asserted not to contain the email domain; `user_profiles` has no email column (DB test) |
+| 2 | Administrator creates accounts and assigns them to protocols with a role | Verified | E2E `users.spec`; DB `admin-users.test` |
+| 3 | Assigned users sign in with username and password | Verified | E2E (forced password change, then dashboard and protocol visible) |
+| 4 | Permitted users create and configure protocols | Verified | E2E editor; DB `create_protocol` with the "can create protocols" flag |
+| 5 | Chapters and functions added, edited, archived, reordered | Verified | E2E editor (buttons and keyboard drag); DB `hierarchy.test` |
+| 6 | Functions hold several test runs; runs hold nested steps and sub-steps | Verified | DB and unit tree tests; E2E sub-steps to three levels |
+| 7 | Several screenshots uploaded at once, previewed, tied to steps | Verified | E2E `execution.spec` (three files, one rejected by name); DB `evidence.test` |
+| 8 | Specific images selected for export | Verified | E2E `report.spec` |
+| 9 | Word document correctly structured, editable, exactly the selected images | Verified (automated) | Unit tests unzip a generated .docx; E2E unzips the downloaded file; Microsoft Word opened a 3-image and a 300-image report (headings recognised, 300 inline images) and exported the small one to PDF, which was inspected. Editing in Word was not tried. |
+| 10 | Earlier exports listed and downloadable by authorised users | Verified | E2E history and re-download; DB storage tests (viewer downloads, outsider refused) |
+| 11 | Data persists across sign-out and sign-in | Verified | E2E editor and execution (reload, sign out and back in) |
+| 12 | Users cannot reach unassigned protocols, including by direct API calls | Verified | DB `rls.test`, `storage.test`, `dashboard.test`, `security.test` with real sessions; E2E direct URL refused |
+| 13 | Production build succeeds | Verified | `npm run build` |
+| 14 | Setup and deployment instructions complete | Written, not exercised on a hosted project | README.md, docs/DEPLOY.md |
+| 15 | Reachable at a public URL and passes the smoke test there | **Blocked**: needs the owner's GitHub, Supabase and Cloudflare accounts | — |
+| 16 | A generated report looks right in Microsoft Word | **Needs the owner** | Opened by automation only; the owner should open a report built from real screenshots in Word |
 
 ## Next step
 
-Phase 8: full test run and clean-up; time a large report (hundreds of images); README (architecture, stack, database, local install, Supabase configuration, administrator initialisation, environment variables, test commands, limits and scope including free-tier limits, audit trail limits, orphan cleanup query, and no compliance claim); docs/DEPLOY.md checklist (GitHub, Supabase project, migrations, buckets, Auth settings, function secrets, Edge Functions, Cloudflare Pages build, env vars, SPA fallback, first-time setup, deleting the setup token, live smoke test) with free-tier numbers from the current pricing pages; deployment needs the owner's accounts, otherwise stop at the checklist. Confirm the synthetic email domain against a hosted project (ADR-001).
+Deployment by the owner, following docs/DEPLOY.md (or give Claude CLI access to Supabase and Cloudflare to deploy and run the smoke test against the live URL). On the hosted project, confirm the synthetic email domain is accepted (ADR-001), then record the live URL and smoke-test date here.

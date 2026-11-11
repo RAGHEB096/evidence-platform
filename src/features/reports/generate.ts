@@ -1,4 +1,4 @@
-import { SIGNED_URL_TTL_SECONDS } from '@/config'
+import { EXPORT_SAVE_LIMIT_BYTES, SIGNED_URL_TTL_SECONDS } from '@/config'
 import type { EvidenceRow } from '@/features/evidence/api'
 import type { PageSizeName, PreparedImage, ReportMeta } from '@/features/reports/docx-builder'
 import type { ReportModel } from '@/features/reports/model'
@@ -93,7 +93,7 @@ export interface GenerateOptions {
  * private exports bucket, records the export server-side (ADR-006), and
  * returns the file for download.
  */
-export async function generateReport(options: GenerateOptions): Promise<{ blob: Blob; fileName: string }> {
+export async function generateReport(options: GenerateOptions): Promise<{ blob: Blob; fileName: string; saveProblem: string | null }> {
   const [{ buildReportDocument }, { Packer }] = await Promise.all([import('@/features/reports/docx-builder'), import('docx')])
   const generatedAt = new Date()
   const total = options.model.counts.images
@@ -126,15 +126,21 @@ export async function generateReport(options: GenerateOptions): Promise<{ blob: 
   const sha256 = await sha256Hex(blob)
   const supabase = getSupabase()
 
+  // Saving a copy is optional; the generated file is never lost because of it.
+  // On failure the export is still recorded (without a file) and downloaded.
   let storagePath: string | null = null
-  if (options.saveCopy) {
+  let saveProblem: string | null = null
+  if (options.saveCopy && blob.size > EXPORT_SAVE_LIMIT_BYTES) {
+    saveProblem = `The report is ${Math.round(blob.size / 1024 / 1024)} MB, above the ${EXPORT_SAVE_LIMIT_BYTES / 1024 / 1024} MB limit for saved copies, so it was downloaded but not saved to Generated Documents. Keep the downloaded file.`
+  } else if (options.saveCopy) {
     options.onProgress({ phase: 'saving', done: total, total })
-    storagePath = `${options.protocolId}/${options.exportId}.docx`
-    const { error } = await supabase.storage.from('exports').upload(storagePath, blob, {
+    const path = `${options.protocolId}/${options.exportId}.docx`
+    const { error } = await supabase.storage.from('exports').upload(path, blob, {
       contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       upsert: false,
     })
-    if (error) throw new Error('The report could not be saved to Generated Documents.')
+    if (error) saveProblem = 'The report was downloaded, but saving a copy to Generated Documents failed. Keep the downloaded file.'
+    else storagePath = path
   }
 
   options.onProgress({ phase: 'recording', done: total, total })
@@ -151,7 +157,7 @@ export async function generateReport(options: GenerateOptions): Promise<{ blob: 
   })
   if (error) throw error
 
-  return { blob, fileName: reportFileName(options.reference, generatedAt) }
+  return { blob, fileName: reportFileName(options.reference, generatedAt), saveProblem }
 }
 
 /** Starts a browser download of a blob. */
