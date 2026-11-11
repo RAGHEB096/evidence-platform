@@ -7,6 +7,7 @@ import { EvidenceLibraryPage } from '@/pages/EvidenceLibraryPage'
 import { GeneratedDocumentsPage } from '@/pages/GeneratedDocumentsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { ProtocolDetailPage } from '@/pages/ProtocolDetailPage'
 import { ProtocolsPage } from '@/pages/ProtocolsPage'
 import { RouteErrorPage } from '@/pages/RouteErrorPage'
 import { SettingsPage } from '@/pages/SettingsPage'
@@ -37,6 +38,7 @@ export const routes: RouteObject[] = [
             children: [
               { index: true, element: <DashboardPage /> },
               { path: 'protocols', element: <ProtocolsPage /> },
+              { path: 'protocols/:protocolId', element: <ProtocolDetailPage /> },
               { path: 'evidence', element: <EvidenceLibraryPage /> },
               { path: 'documents', element: <GeneratedDocumentsPage /> },
               {

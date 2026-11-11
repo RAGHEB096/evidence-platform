@@ -10,7 +10,7 @@ Maintained by Claude across sessions. Read this after CLAUDE.md, SPEC.md and ARC
 | 1 Project setup, layout, routing, Supabase client, local Supabase | Done | `a30798c` |
 | 2 Schema, migrations, RLS, username auth, first-admin setup | Done | `34292d7` |
 | 3 User management, protocol access | Done | `038d80a` |
-| 4 Protocol editor and hierarchy | Not started | |
+| 4 Protocol editor and hierarchy | Done | "Phase 4: …" |
 | 5 Execution and evidence upload | Not started | |
 | 6 Report builder and Word generation | Not started | |
 | 7 Dashboard, audit viewer, settings, security review | Not started | |
@@ -41,21 +41,23 @@ npm run build
 npm run dev         # http://localhost:5173 (after a reset, /setup is offered on the sign-in page)
 ```
 
+Phase 4 exit evidence (2026-11-11): `test:db` 74 passed (adds 12 for reorder/archive/restore/duplicate); `test:e2e` 10 passed (adds the editor flow: build all five levels, edit, reorder by button and keyboard drag, duplicate, archive with counts, administrator restore, persistence after sign-out and sign-in; and an unassigned user refused by direct URL); unit 35 (adds tree building, numbering, moves, run-status derivation); typecheck, lint, build clean.
+
 Phase 3 exit evidence (2026-11-11): `test:db` 62 passed (adds 11 for `admin-users`); `test:e2e` 8 passed (adds creating a user, granting and changing a role, the user signing in through the forced password change, deactivation blocking them, and the no-access empty state); unit 19; typecheck, lint, build clean.
 
 Phase 2 exit evidence (2026-11-11): `test:db` 51 passed; `test:e2e` 6 passed; unit tests 19 passed; typecheck, lint and build clean. Mutation check: loosening the protocol update policy to viewers made 2 RLS tests fail, as expected.
 
 ## Data model as built (Phase 2)
 
-Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`).
+Migrations: `20261111100000_core_schema.sql` (tables, helpers, RLS, grants, audit), `20261111100100_auth_and_storage.sql` (setup, account RPCs, `create_protocol`, `user_directory`, buckets, storage policies), `20261111100200_user_administration.sql` (`svc_set_user_flags`, `svc_set_display_name`), `20261111100300_hierarchy_operations.sql` (`node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`).
 
 - Default privileges are revoked: a new table or function is unreachable through the API until a migration grants it.
 - Helpers in schema `private`: `active_user_id`, `is_admin`, `can_create_protocols`, `protocol_role`, `has_protocol_role(protocol, min_role)`, `try_uuid`, `current_actor`, `write_audit`. All return "no access" for inactive users and for users who must change their password.
 - Column-level grants decide what API roles may write. Positions, parents, `protocol_id`, `deleted_at`, execution fields, evidence hash/path/uploader and export status are never directly writable.
-- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`.
+- RPCs so far: `needs_setup`, `create_protocol`, `complete_password_change`, `user_directory`, `node_counts`, `reorder_siblings`, `archive_node`, `restore_node`, `duplicate_node`; service-only: `svc_bootstrap_admin`, `svc_create_user`, `svc_set_user_active`, `svc_record_password_reset`, `svc_set_user_flags`, `svc_set_display_name`.
 - Edge Functions: `bootstrap-admin`, `admin-users` (actions `create`, `reset_password`, `set_active`, `set_flags`, `set_display_name`).
-- Still to come: `record_step_result` and `svc_register_evidence` (Phase 5); `reorder_siblings`, `duplicate_node`, `archive_node`, `restore_node` (Phase 4); `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
-- Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`.
+- Still to come: `record_step_result` and `svc_register_evidence` (Phase 5); `finalize_export` (Phase 6); `dashboard_stats` (Phase 7).
+- Audit event types come from the generic trigger: `<entity>.created|updated|archived|restored|deleted`, plus `test_step.result_recorded`, `evidence.metadata_changed`, `document_export.generated`, `user.activated|deactivated`, `access.granted|changed|removed`, `selection.added|changed|removed`. Explicit events: `user.password_reset`, `user.password_changed`, `<type>.duplicated` (with `source_id`).
 
 ## Decisions
 
@@ -95,6 +97,15 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 - **Protocols list and "Create protocol" were built in Phase 3**, because assigning access needs protocols to exist. The list filters by status; administrators can also filter for archived protocols.
 - **User Management:** a list with search and status/permission filters, plus a detail page (`/users/:id`) with edit, reset password, deactivate/reactivate, and a protocol-access table where roles are added, changed and removed.
 
+### Phase 4
+- **Archive cascades in one transaction with one timestamp**, including evidence beneath the node. `restore_node` restores only rows carrying that same timestamp, so items archived separately beforehand stay archived. Restoring requires the parent to be live. Only administrators restore (SPEC 4.3); managers archive structure and evidence; only administrators archive protocols.
+- **Reorder** takes the full list of live siblings. Anything else (missing, extra, duplicate, foreign id) is refused as `stale_order` and the client refetches. Archived siblings are renumbered after the live ones. For steps, `p_parent_id` is the test run (top-level steps) or the parent step (sub-steps).
+- **Duplicate** (chapters, functions, test runs) copies live descendants only, keeps references and texts, resets execution fields, copies no evidence, inserts directly after the source (shifting later siblings), and appends " (copy)" to the top node's title. An explicit `<type>.duplicated` audit event records the source.
+- **Moving a node to a different parent is not supported** (not in the spec). Parent columns are not client-writable, so the denormalised ids on evidence can never go stale.
+- **Tree UI:** each sibling list has its own dnd-kit `DndContext`. Disabled lists still get one, otherwise their items register as drop targets in the parent's list (found by the E2E keyboard-drag test). Reordering works by pointer drag, keyboard drag (Space, arrows, Space) with announcements that name the node, and visible up/down buttons. Numbering ("1.2.3", "Step 2.1") is computed client-side from position order, and archived nodes are not numbered.
+- **Not-assigned protocols** show "Protocol not available", which does not reveal whether the protocol exists.
+- **Protocol detail page** (`/protocols/:id`) has Structure, Details (managers edit; others read-only) and Team (managers and administrators) tabs; administrators archive and restore the protocol from the header.
+
 ## Known gaps
 
 - `npm audit`: 10 moderate advisories, all `minimatch` inside ESLint/typescript-eslint (dev-only, not shipped). Recheck later.
@@ -104,4 +115,4 @@ Ordinary implementation choices that are not obvious from the code. Design-level
 
 ## Next step
 
-Phase 4: protocol detail page and editor with the full tree (chapter → function → test run → step → sub-steps): add, edit, archive with descendant counts, reorder by drag and drop and by up/down buttons, duplicate, administrator restore of archived items, protocol details editing. RPCs `reorder_siblings`, `duplicate_node`, `archive_node`, `restore_node` with DB tests. E2E for the editor, persistence after sign-out, and a second user being refused an unassigned protocol.
+Phase 5: execution view for a test run (actual result, status, comments per step; derived run status) through `record_step_result`; `finalize-evidence` Edge Function and `svc_register_evidence`; multi-file upload with per-file progress and validation (extension, MIME, magic bytes, size from settings); thumbnails via signed URLs; preview with next/previous; caption/description editing by role; evidence archive; Evidence Library with search and filters. Unit tests for file validation (renamed non-image, truncated image).

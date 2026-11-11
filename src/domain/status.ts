@@ -25,10 +25,12 @@ export const PROTOCOL_STATUSES = {
   draft: { label: 'Draft', tone: 'neutral' },
   active: { label: 'Active', tone: 'info' },
   completed: { label: 'Completed', tone: 'success' },
-  archived: { label: 'Archived', tone: 'muted' },
 } as const satisfies Record<string, StatusDefinition>
 
 export type ProtocolStatus = keyof typeof PROTOCOL_STATUSES
+
+/** Shown for any archived (soft-deleted) record, whatever its stored status (ADR-015). */
+export const ARCHIVED_STATUS: StatusDefinition = { label: 'Archived', tone: 'muted' }
 
 export const EXPORT_STATUSES = {
   draft: { label: 'Draft', tone: 'neutral' },

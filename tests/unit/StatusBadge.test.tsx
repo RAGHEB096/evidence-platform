@@ -16,7 +16,7 @@ describe('StatusBadge', () => {
     expect(labels).toEqual(['Not Started', 'In Progress', 'Passed', 'Failed', 'Blocked', 'Not Applicable'])
   })
 
-  it('covers every protocol status from the data model', () => {
-    expect(Object.keys(PROTOCOL_STATUSES)).toEqual(['draft', 'active', 'completed', 'archived'])
+  it('covers every protocol status from the data model (archived is the soft-deleted state, ADR-015)', () => {
+    expect(Object.keys(PROTOCOL_STATUSES)).toEqual(['draft', 'active', 'completed'])
   })
 })

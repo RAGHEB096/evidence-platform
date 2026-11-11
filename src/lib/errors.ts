@@ -13,6 +13,11 @@ const HINT_MESSAGES: Record<string, string> = {
   reference_taken: 'A protocol with this reference already exists.',
   not_allowed: 'You do not have permission to do this.',
   setup_done: 'Setup has already been completed.',
+  stale_order: 'The list changed since you opened it. It has been reloaded; try again.',
+  already_archived: 'This item is already archived.',
+  not_archived: 'This item is not archived.',
+  archived: 'Archived items cannot be changed or duplicated.',
+  not_found: 'The item was not found, or you do not have access to it.',
 }
 
 const GENERIC = 'Something went wrong. Try again; if it keeps happening, tell your administrator.'

@@ -1,5 +1,6 @@
 import { FolderKanbanIcon, PlusIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '@/auth/useAuth'
 import { FilterSelect, ListToolbar } from '@/components/ListToolbar'
 import { PageHeader } from '@/components/PageHeader'
@@ -9,7 +10,7 @@ import { LoadingState } from '@/components/states/LoadingState'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { PROTOCOL_STATUSES, type ProtocolStatus, type StatusDefinition } from '@/domain/status'
+import { ARCHIVED_STATUS, PROTOCOL_STATUSES, type ProtocolStatus, type StatusDefinition } from '@/domain/status'
 import { useProtocols, type ProtocolRow } from '@/features/protocols/api'
 import { CreateProtocolDialog } from '@/features/protocols/CreateProtocolDialog'
 import { toUserMessage } from '@/lib/errors'
@@ -17,11 +18,9 @@ import { formatDateTime, matchesSearch } from '@/lib/format'
 
 type StatusFilter = 'all' | ProtocolStatus | 'archived'
 
-const ARCHIVED: StatusDefinition = { label: 'Archived', tone: 'muted' }
-
 /** An archived protocol shows as Archived whatever its stored status (ADR-015). */
 function displayStatus(protocol: ProtocolRow): StatusDefinition {
-  return protocol.deleted_at ? ARCHIVED : PROTOCOL_STATUSES[protocol.status]
+  return protocol.deleted_at ? ARCHIVED_STATUS : PROTOCOL_STATUSES[protocol.status]
 }
 
 export function ProtocolsPage() {
@@ -103,7 +102,11 @@ export function ProtocolsPage() {
               {filtered.map((protocol) => (
                 <TableRow key={protocol.id}>
                   <TableCell className="font-mono text-sm">{protocol.reference}</TableCell>
-                  <TableCell className="font-medium">{protocol.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link to={`/protocols/${protocol.id}`} className="underline-offset-2 hover:underline">
+                      {protocol.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{protocol.version}</TableCell>
                   <TableCell>
                     <StatusBadge status={displayStatus(protocol)} />
