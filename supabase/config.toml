@@ -430,3 +430,9 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# Edge Functions verify the caller themselves: bootstrap-admin is called before
+# anyone has a session, and the others check the user's JWT with auth.getUser,
+# which also rejects banned (deactivated) users. See docs/PROGRESS.md.
+[functions.bootstrap-admin]
+verify_jwt = false

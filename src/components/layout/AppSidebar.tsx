@@ -13,6 +13,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { isNavItemActive, visibleNavItems } from '@/components/layout/nav'
+import { UserMenu } from '@/components/layout/UserMenu'
 
 export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
   const { pathname } = useLocation()
@@ -59,7 +60,9 @@ export function AppSidebar({ isAdmin }: { isAdmin: boolean }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter />
+      <SidebarFooter>
+        <UserMenu />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )
